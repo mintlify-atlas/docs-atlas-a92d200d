@@ -1,0 +1,212 @@
+{
+  "projectType": "framework",
+  "projectName": "BuilderBot",
+  "projectDescription": "A TypeScript framework for building WhatsApp chatbots with multiple providers and conversation flows.",
+  "theme": "palm",
+  "primaryColor": "#00B4D8",
+  "lightColor": "#90E0EF",
+  "darkColor": "#0077B6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/flows",
+              "concepts/keywords",
+              "concepts/providers",
+              "concepts/databases",
+              "concepts/state-management",
+              "concepts/events"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "providers/overview",
+              "providers/baileys",
+              "providers/meta",
+              "providers/evolution-api",
+              "providers/telegram",
+              "providers/twilio",
+              "providers/facebook-messenger",
+              "providers/instagram",
+              "providers/email",
+              "providers/wppconnect",
+              "providers/venom",
+              "providers/web-whatsapp",
+              "providers/sherpa",
+              "providers/gohighlevel"
+            ]
+          },
+          {
+            "group": "Databases",
+            "pages": [
+              "databases/overview",
+              "databases/memory",
+              "databases/json",
+              "databases/mongodb",
+              "databases/mysql",
+              "databases/postgresql"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-flows",
+              "guides/handling-media",
+              "guides/state-management",
+              "guides/custom-endpoints",
+              "guides/queue-system",
+              "guides/blacklist",
+              "guides/testing"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/dialogflow",
+              "integrations/dialogflow-cx",
+              "integrations/openai"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/create-bot",
+              "api/create-flow",
+              "api/create-provider",
+              "api/add-keyword",
+              "api/add-answer",
+              "api/add-action"
+            ]
+          },
+          {
+            "group": "Bot Instance",
+            "pages": [
+              "api/bot/send-message",
+              "api/bot/dispatch",
+              "api/bot/blacklist",
+              "api/bot/state"
+            ]
+          },
+          {
+            "group": "Flow Methods",
+            "pages": [
+              "api/flow/goto-flow",
+              "api/flow/end-flow",
+              "api/flow/fall-back",
+              "api/flow/flow-dynamic"
+            ]
+          },
+          {
+            "group": "Context & State",
+            "pages": [
+              "api/context",
+              "api/state/global",
+              "api/state/conversation",
+              "api/state/idle"
+            ]
+          },
+          {
+            "group": "Utils",
+            "pages": [
+              "api/utils/events",
+              "api/utils/helpers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/overview",
+              "cli/create",
+              "cli/commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "community/contributing",
+              "community/examples",
+              "community/faq",
+              "community/changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-provider support (WhatsApp, Telegram, Email, Facebook, Instagram)",
+    "Flow-based conversation builder with addKeyword and addAnswer",
+    "Multiple database adapters (MongoDB, MySQL, PostgreSQL, JSON, Memory)",
+    "State management (global and per-conversation)",
+    "Queue system for concurrent message handling",
+    "Event-driven architecture with custom events",
+    "Media handling (images, videos, audio, documents)",
+    "HTTP endpoints for external integrations",
+    "Dialogflow integration for NLU",
+    "CLI for quick project scaffolding",
+    "Blacklist management",
+    "Idle state detection",
+    "TypeScript support"
+  ],
+  "publicApiSurface": [
+    "createBot",
+    "createFlow",
+    "createProvider",
+    "addKeyword",
+    "addAnswer",
+    "addAction",
+    "CoreClass",
+    "ProviderClass",
+    "EventEmitterClass",
+    "MemoryDB",
+    "EVENTS",
+    "utils.setEvent",
+    "BaileysProvider",
+    "MetaProvider",
+    "EvolutionApiProvider",
+    "TelegramProvider",
+    "TwilioProvider",
+    "FacebookMessengerProvider",
+    "InstagramProvider",
+    "EmailProvider",
+    "WPPConnectProvider",
+    "VenomProvider",
+    "WebWhatsAppProvider",
+    "SherpaProvider",
+    "GoHighLevelProvider",
+    "MongoAdapter",
+    "MySQLAdapter",
+    "PostgreSQLAdapter",
+    "JsonAdapter",
+    "DialogflowContext",
+    "DialogflowCXContext"
+  ]
+}
