@@ -1,0 +1,104 @@
+---
+title: Web WhatsApp Provider
+description: WhatsApp Web automation provider
+---
+
+The Web WhatsApp provider enables WhatsApp integration through direct WhatsApp Web automation, providing a lightweight solution for WhatsApp chatbots.
+
+## Features
+
+- QR code authentication
+- Text messaging
+- Media support
+- Session persistence
+- WhatsApp Web automation
+- Group messaging
+- Contact management
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-web-whatsapp
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { WebWhatsAppProvider } from '@builderbot/provider-web-whatsapp'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(WebWhatsAppProvider, {
+  name: 'my-bot',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+## Authentication
+
+### QR Code
+
+On first run:
+1. Start your bot
+2. QR code appears at `http://localhost:3000/`
+3. Scan with WhatsApp
+4. Wait for connection
+
+### Session Persistence
+
+Sessions are saved automatically in:
+```
+{name}_sessions/
+```
+
+## Basic Usage
+
+### Sending Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome')
+  .addAnswer('How can I help?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('media')
+  .addAnswer('Here is an image:', {
+    media: './assets/image.jpg'
+  })
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Session Management">
+    - Backup session files
+    - Monitor session health
+    - Implement reconnection logic
+  </Accordion>
+
+  <Accordion title="Performance">
+    - Use headless browser mode
+    - Monitor memory usage
+    - Restart periodically
+  </Accordion>
+</AccordionGroup>
+
+## Further Resources
+
+- [WhatsApp Web](https://web.whatsapp.com)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

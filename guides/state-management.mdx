@@ -1,0 +1,480 @@
+---
+title: State Management
+description: Store and manage conversation state and user data
+---
+
+State management lets you remember information about users across messages. BuilderBot provides two types of state: **user state** (per conversation) and **global state** (shared across all conversations).
+
+## User State
+
+User state stores data specific to each conversation, identified by the user's phone number.
+
+### Updating State
+
+Store data using `state.update()`:
+
+```javascript
+const registerFlow = addKeyword('register')
+    .addAnswer(
+        'What is your name?',
+        { capture: true },
+        async (ctx, { state }) => {
+            await state.update({ name: ctx.body })
+        }
+    )
+    .addAnswer(
+        'What is your age?',
+        { capture: true },
+        async (ctx, { state }) => {
+            await state.update({ age: ctx.body })
+        }
+    )
+```
+
+<Note>
+  `state.update()` merges new data with existing state. It doesn't replace the entire state.
+</Note>
+
+### Reading State
+
+Retrieve stored data using `state.get()`:
+
+```javascript
+.addAction(async (ctx, { flowDynamic, state }) => {
+    const name = state.get('name')
+    const age = state.get('age')
+    
+    await flowDynamic(`${name}, thanks for your information! Your age: ${age}`)
+})
+```
+
+### Getting Nested Properties
+
+Access nested object properties with dot notation:
+
+```javascript
+await state.update({ 
+    user: { 
+        profile: { 
+            email: 'user@example.com',
+            phone: '123456789'
+        } 
+    } 
+})
+
+// Access nested property
+const email = state.get('user.profile.email')
+// Returns: 'user@example.com'
+```
+
+### Getting All State
+
+Get the entire state object:
+
+```javascript
+.addAction(async (ctx, { flowDynamic, state }) => {
+    const allState = state.getMyState()
+    console.log('Complete state:', allState)
+})
+```
+
+### Clearing State
+
+Clear all state for a user:
+
+```javascript
+const logoutFlow = addKeyword('logout')
+    .addAction(async (ctx, { flowDynamic, state }) => {
+        state.clear()
+        await flowDynamic('Your session has been cleared.')
+    })
+```
+
+## Complete User State Example
+
+<Steps>
+  <Step title="Create a multi-step registration flow">
+    ```javascript
+    import { addKeyword } from '@builderbot/bot'
+
+    const registerFlow = addKeyword('register')
+        .addAnswer(
+            'What is your name?',
+            { capture: true },
+            async (ctx, { state }) => {
+                await state.update({ name: ctx.body })
+            }
+        )
+    ```
+  </Step>
+
+  <Step title="Collect additional information">
+    ```javascript
+        .addAnswer(
+            'What is your email?',
+            { capture: true },
+            async (ctx, { state, fallBack }) => {
+                // Validate email
+                if (!ctx.body.includes('@')) {
+                    return fallBack('Please enter a valid email')
+                }
+                await state.update({ email: ctx.body })
+            }
+        )
+        .addAnswer(
+            'What is your age?',
+            { capture: true },
+            async (ctx, { state, fallBack }) => {
+                const age = parseInt(ctx.body)
+                if (isNaN(age) || age < 1) {
+                    return fallBack('Please enter a valid age')
+                }
+                await state.update({ age })
+            }
+        )
+    ```
+  </Step>
+
+  <Step title="Display collected data">
+    ```javascript
+        .addAction(async (ctx, { flowDynamic, state }) => {
+            const name = state.get('name')
+            const email = state.get('email')
+            const age = state.get('age')
+            
+            await flowDynamic([
+                '✅ Registration complete!',
+                `Name: ${name}`,
+                `Email: ${email}`,
+                `Age: ${age}`
+            ].join('\n'))
+            
+            // Save to database
+            await saveToDatabase({ name, email, age })
+        })
+    ```
+  </Step>
+</Steps>
+
+## Global State
+
+Global state is shared across all conversations. Use it for configuration, counters, or shared resources.
+
+### Initializing Global State
+
+Set initial global state when creating the bot:
+
+```javascript
+const { httpServer } = await createBot(
+    {
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    },
+    {
+        globalState: {
+            appName: 'MyBot',
+            version: '1.0.0',
+            totalUsers: 0
+        }
+    }
+)
+```
+
+### Reading Global State
+
+Access global state in any flow:
+
+```javascript
+const infoFlow = addKeyword('info')
+    .addAction(async (ctx, { flowDynamic, globalState }) => {
+        const appName = globalState.get('appName')
+        const version = globalState.get('version')
+        
+        await flowDynamic(`${appName} v${version}`)
+    })
+```
+
+### Updating Global State
+
+Modify global state from any flow:
+
+```javascript
+const welcomeFlow = addKeyword(['hi', 'hello'])
+    .addAction(async (ctx, { flowDynamic, globalState }) => {
+        const totalUsers = globalState.get('totalUsers') || 0
+        await globalState.update({ totalUsers: totalUsers + 1 })
+        
+        await flowDynamic(`Welcome! You are user #${totalUsers + 1}`)
+    })
+```
+
+### Getting All Global State
+
+```javascript
+.addAction(async (ctx, { globalState }) => {
+    const allGlobalState = globalState.getAllState()
+    console.log('Global state:', allGlobalState)
+})
+```
+
+### Clearing Global State
+
+Reset all global state:
+
+```javascript
+const resetFlow = addKeyword('reset-global')
+    .addAction(async (ctx, { flowDynamic, globalState }) => {
+        globalState.clear()
+        await flowDynamic('Global state cleared')
+    })
+```
+
+## State in HTTP Endpoints
+
+Access state in custom HTTP endpoints:
+
+### User State via API
+
+```javascript
+adapterProvider.server.get(
+    '/v1/user/:number/state',
+    handleCtx(async (bot, req, res) => {
+        const { number } = req.params
+        const userState = bot.state(number).getMyState()
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify(userState))
+    })
+)
+```
+
+### Global State via API
+
+```javascript
+adapterProvider.server.get(
+    '/v1/global-state',
+    handleCtx(async (bot, req, res) => {
+        const state = bot.globalState().getAllState()
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify(state))
+    })
+)
+```
+
+### Updating State via API
+
+```javascript
+adapterProvider.server.post(
+    '/v1/user/:number/state',
+    handleCtx(async (bot, req, res) => {
+        const { number } = req.params
+        const { key, value } = req.body
+        
+        await bot.state(number).update({ [key]: value })
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ status: 'ok' }))
+    })
+)
+```
+
+## Practical Examples
+
+### Shopping Cart
+
+```javascript
+const addToCartFlow = addKeyword('add')
+    .addAnswer(
+        'Which product? (Enter product ID)',
+        { capture: true },
+        async (ctx, { state, flowDynamic }) => {
+            const productId = ctx.body
+            const cart = state.get('cart') || []
+            
+            cart.push({ id: productId, quantity: 1 })
+            await state.update({ cart })
+            
+            await flowDynamic(`Added to cart! Total items: ${cart.length}`)
+        }
+    )
+
+const viewCartFlow = addKeyword('cart')
+    .addAction(async (ctx, { state, flowDynamic }) => {
+        const cart = state.get('cart') || []
+        
+        if (cart.length === 0) {
+            await flowDynamic('Your cart is empty')
+            return
+        }
+        
+        const items = cart.map((item, i) => 
+            `${i + 1}. Product ${item.id} (Qty: ${item.quantity})`
+        ).join('\n')
+        
+        await flowDynamic(['Your cart:', items].join('\n'))
+    })
+```
+
+### User Preferences
+
+```javascript
+const setLanguageFlow = addKeyword('language')
+    .addAnswer(
+        ['Choose language:', '1. English', '2. Spanish', '3. French'].join('\n'),
+        { capture: true },
+        async (ctx, { state, flowDynamic, fallBack }) => {
+            const languages = { '1': 'en', '2': 'es', '3': 'fr' }
+            const choice = ctx.body.trim()
+            
+            if (!languages[choice]) {
+                return fallBack('Please choose 1, 2, or 3')
+            }
+            
+            await state.update({ language: languages[choice] })
+            await flowDynamic(`Language set to ${languages[choice]}`)
+        }
+    )
+
+const greetFlow = addKeyword(['hi', 'hello'])
+    .addAction(async (ctx, { state, flowDynamic }) => {
+        const language = state.get('language') || 'en'
+        const greetings = {
+            en: 'Hello!',
+            es: '¡Hola!',
+            fr: 'Bonjour!'
+        }
+        
+        await flowDynamic(greetings[language])
+    })
+```
+
+### Session Counter
+
+```javascript
+const counterFlow = addKeyword('count')
+    .addAction(async (ctx, { state, flowDynamic }) => {
+        const count = state.get('messageCount') || 0
+        const newCount = count + 1
+        
+        await state.update({ messageCount: newCount })
+        await flowDynamic(`You've sent ${newCount} messages to this bot`)
+    })
+```
+
+## State Architecture
+
+Understanding how state works internally:
+
+<Accordion title="State is stored in memory by default">
+  User state is stored in a `Map` structure, keyed by the user's phone number:
+  ```typescript
+  private STATE: Map<string, StateValue> = new Map()
+  // Example: Map { '1234567890' => { name: 'John', age: 30 } }
+  ```
+</Accordion>
+
+<Accordion title="State persists during bot runtime">
+  State remains in memory while the bot is running. When the bot restarts, state is lost unless you persist it to a database.
+</Accordion>
+
+<Accordion title="Each user has isolated state">
+  State for user `1234567890` is completely separate from state for user `0987654321`.
+</Accordion>
+
+## Best Practices
+
+<Accordion title="Use descriptive state keys">
+  ```javascript
+  // Good
+  await state.update({ userEmail: email, isSubscribed: true })
+  
+  // Avoid
+  await state.update({ e: email, s: true })
+  ```
+</Accordion>
+
+<Accordion title="Validate before storing">
+  ```javascript
+  .addAnswer('Enter email:', { capture: true }, async (ctx, { state, fallBack }) => {
+      const email = ctx.body.trim()
+      
+      if (!email.includes('@')) {
+          return fallBack('Invalid email format')
+      }
+      
+      await state.update({ email })
+  })
+  ```
+</Accordion>
+
+<Accordion title="Clear state when sessions end">
+  ```javascript
+  const logoutFlow = addKeyword('logout')
+      .addAction(async (ctx, { state, flowDynamic }) => {
+          state.clear()
+          await flowDynamic('Session ended. All data cleared.')
+      })
+  ```
+</Accordion>
+
+<Accordion title="Use global state sparingly">
+  Global state is shared across all users. Use it only for truly global data like configuration or counters, not user-specific data.
+</Accordion>
+
+<Accordion title="Persist important state to database">
+  For data that must survive bot restarts, save to your database:
+  ```javascript
+  .addAction(async (ctx, { state, database }) => {
+      const userData = state.getMyState()
+      await database.save({ from: ctx.from, ...userData })
+  })
+  ```
+</Accordion>
+
+## Common Patterns
+
+### Multi-step Form
+
+```javascript
+const surveyFlow = addKeyword('survey')
+    .addAnswer('Question 1: How old are you?', { capture: true }, 
+        async (ctx, { state }) => {
+            await state.update({ q1: ctx.body })
+        })
+    .addAnswer('Question 2: Where are you from?', { capture: true },
+        async (ctx, { state }) => {
+            await state.update({ q2: ctx.body })
+        })
+    .addAction(async (ctx, { state, flowDynamic }) => {
+        const answers = {
+            age: state.get('q1'),
+            location: state.get('q2')
+        }
+        await saveSurveyResults(answers)
+        await flowDynamic('Thank you for completing the survey!')
+    })
+```
+
+### Conditional Flow Based on State
+
+```javascript
+const menuFlow = addKeyword('menu')
+    .addAction(async (ctx, { state, flowDynamic, gotoFlow }) => {
+        const isRegistered = state.get('isRegistered')
+        
+        if (!isRegistered) {
+            await flowDynamic('Please register first')
+            return gotoFlow(registerFlow)
+        }
+        
+        await flowDynamic('Welcome back! Here\'s your menu...')
+    })
+```
+
+## Next Steps
+
+- Learn about [Database Adapters](/databases/overview) to persist state
+- Explore [Custom Endpoints](/guides/custom-endpoints) to manage state via API
+- Check out [Testing](/guides/testing) to test state management

@@ -1,0 +1,293 @@
+---
+title: npm create builderbot
+description: Create a new BuilderBot project with the interactive scaffolding tool
+---
+
+The `npm create builderbot` command is the recommended way to create new BuilderBot projects. It provides an interactive wizard that helps you configure your chatbot with the right provider, database, and language settings.
+
+## Basic Usage
+
+### Interactive Mode
+
+Run the command without any arguments to launch the interactive setup:
+
+```bash
+npm create builderbot@latest
+```
+
+This will:
+1. Display the BuilderBot version and welcome message
+2. Check system requirements (Node.js 20+, Git)
+3. Prompt for provider selection
+4. Prompt for database selection
+5. Prompt for language preference
+6. Create the project directory
+7. Copy template files
+8. Display setup instructions
+
+### Non-Interactive Mode
+
+You can skip the interactive prompts by providing all required arguments:
+
+```bash
+npm create builderbot@latest -- --provider=baileys --database=mongo --language=ts
+```
+
+## Command Arguments
+
+When using non-interactive mode, all three arguments are required:
+
+### `--provider`
+
+Specifies the WhatsApp or messaging provider.
+
+**Available options:**
+
+```bash
+--provider=baileys           # Baileys (opensource)
+--provider=sherpa            # Sherpa (opensource)
+--provider=evolution-api     # Evolution API (opensource)
+--provider=wppconnect         # WPPConnect (opensource)
+--provider=twilio            # Twilio
+--provider=meta              # Meta/Facebook
+--provider=facebook-messenger # Facebook Messenger
+--provider=instagram         # Instagram
+--provider=gohighlevel       # GoHighLevel
+--provider=email             # Email (IMAP/SMTP)
+```
+
+### `--database`
+
+Specifies the database backend for storing conversation data.
+
+**Available options:**
+
+```bash
+--database=memory     # In-memory storage (dev only)
+--database=json       # JSON file storage
+--database=mongo      # MongoDB
+--database=mysql      # MySQL
+--database=postgres   # PostgreSQL
+```
+
+### `--language`
+
+Specifies the programming language for the project.
+
+**Available options:**
+
+```bash
+--language=ts    # TypeScript
+--language=js    # JavaScript
+```
+
+## Examples
+
+### Create a TypeScript Project with Baileys and MongoDB
+
+```bash
+npm create builderbot@latest -- --provider=baileys --database=mongo --language=ts
+```
+
+This creates a project directory named `base-ts-baileys-mongo`.
+
+### Create a JavaScript Project with Meta and PostgreSQL
+
+```bash
+npm create builderbot@latest -- --provider=meta --database=postgres --language=js
+```
+
+This creates a project directory named `base-js-meta-postgres`.
+
+### Create an Email Bot with JSON Storage
+
+```bash
+npm create builderbot@latest -- --provider=email --database=json --language=ts
+```
+
+This creates a project directory named `base-ts-email-json`.
+
+## Project Structure
+
+After running the command, you'll get a project with this structure:
+
+```
+base-[language]-[provider]-[database]/
+├── .gitignore
+├── package.json
+├── src/
+│   ├── app.ts (or app.js)
+│   └── flows/
+│       └── welcome.flow.ts
+├── .env.example
+└── README.md
+```
+
+## What Happens During Creation
+
+### 1. System Check
+
+The CLI verifies:
+- Node.js version is 20 or higher
+- Git is installed and accessible
+
+### 2. Template Selection
+
+Based on your selections, the CLI:
+- Determines the correct template name: `base-[language]-[provider]-[database]`
+- Locates the template in the starters directory
+- Validates the template exists
+
+### 3. File Copying
+
+The CLI:
+- Creates a new directory with the template name
+- Copies all template files to the new directory
+- Renames `_gitignore` to `.gitignore`
+- Sets the correct BuilderBot package versions in `package.json`
+
+### 4. Completion
+
+After successful creation, you'll see:
+
+```bash
+✔ Successfully completed!
+
+Instructions:
+ cd base-ts-baileys-mongo
+ npm install
+ npm run dev
+
+📄 Documentation:
+   https://builderbot.app
+
+🤖 Issues? Join:
+   https://link.codigoencasa.com/DISCORD
+```
+
+## Post-Installation Steps
+
+### 1. Navigate to Project
+
+```bash
+cd base-ts-baileys-mongo
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your provider credentials and database connection details.
+
+### 4. Start Development
+
+For TypeScript projects:
+
+```bash
+npm run dev
+```
+
+For JavaScript projects:
+
+```bash
+npm start
+```
+
+## Error Handling
+
+### Missing Arguments
+
+If you provide some but not all arguments in non-interactive mode:
+
+```bash
+✖ Invalid arguments: You must send all three arguments: --provider, --database and --language
+
+Example: --provider=baileys --database=mongo --language=js
+
+If you want to use the interactive mode, just run the command without arguments.
+```
+
+### Invalid Provider
+
+```bash
+✖ Invalid provider: invalid-name
+```
+
+### Invalid Database
+
+```bash
+✖ Invalid database: invalid-db
+```
+
+### Invalid Language
+
+```bash
+✖ Invalid language: py
+```
+
+### System Requirements Not Met
+
+If Node.js version is too old:
+
+```bash
+Node.js 20 or higher is required.. (v18.0.0)
+✖ Operation canceled
+```
+
+If Git is not installed:
+
+```bash
+Requires GIT installation
+✖ Operation canceled
+```
+
+## Advanced Usage
+
+### Using Specific Versions
+
+Create a project with a specific BuilderBot version:
+
+```bash
+npm create builderbot@1.3.15
+```
+
+### Using Different Package Managers
+
+With Yarn:
+
+```bash
+yarn create builderbot
+```
+
+With pnpm:
+
+```bash
+pnpm create builderbot
+```
+
+## Templates Matrix
+
+The CLI includes pre-built templates for all combinations:
+
+- **Languages:** 2 (TypeScript, JavaScript)
+- **Providers:** 10 (Baileys, Sherpa, Evolution API, WPPConnect, Twilio, Meta, Facebook Messenger, Instagram, GoHighLevel, Email)
+- **Databases:** 5 (Memory, JSON, MongoDB, MySQL, PostgreSQL)
+
+**Total available templates:** 100+ combinations
+
+Each template is production-ready with:
+- Proper typing (TypeScript projects)
+- Provider-specific configuration
+- Database connection setup
+- Example flows and handlers
+- Development tooling

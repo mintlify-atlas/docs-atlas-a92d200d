@@ -1,0 +1,85 @@
+---
+title: Context Object
+description: The context object passed to flow callback functions
+---
+
+The context object contains information about the incoming message and user. It's the first parameter passed to all flow callback functions.
+
+## Usage
+
+```javascript
+const flow = addKeyword('hello')
+  .addAnswer('Hi!', null, async (ctx, { flowDynamic }) => {
+    console.log(ctx.body) // message text
+    console.log(ctx.from) // sender number
+  })
+```
+
+## Properties
+
+<ResponseField name="body" type="string" required>
+  The text content of the incoming message.
+</ResponseField>
+
+<ResponseField name="from" type="string" required>
+  The phone number of the message sender (e.g., "1234567890@c.us").
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The name of the contact who sent the message.
+</ResponseField>
+
+<ResponseField name="host" type="object">
+  Information about the bot host.
+  
+  <Expandable title="properties">
+    <ResponseField name="phone" type="string">
+      The phone number of the bot.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pushName" type="string">
+  The push name (display name) of the sender.
+</ResponseField>
+
+## Additional Properties
+
+Depending on the message type, the context may include additional properties:
+
+<ResponseField name="mediaUrl" type="string">
+  URL of the media file (for media messages).
+</ResponseField>
+
+<ResponseField name="mediaType" type="string">
+  Type of media: `image`, `video`, `audio`, `document`.
+</ResponseField>
+
+<ResponseField name="caption" type="string">
+  Caption text for media messages.
+</ResponseField>
+
+<ResponseField name="lat" type="number">
+  Latitude for location messages.
+</ResponseField>
+
+<ResponseField name="lng" type="number">
+  Longitude for location messages.
+</ResponseField>
+
+## Example
+
+```javascript
+const welcomeFlow = addKeyword(['hello', 'hi'])
+  .addAnswer(
+    'Welcome!',
+    null,
+    async (ctx) => {
+      const { body, from, name } = ctx
+      
+      console.log(`Message: ${body}`)
+      console.log(`From: ${from}`)
+      console.log(`Name: ${name}`)
+    }
+  )
+```

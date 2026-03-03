@@ -1,0 +1,259 @@
+---
+title: Blacklist
+description: Manage blocked and allowed users with the blacklist system
+---
+
+The blacklist feature allows you to control which users can interact with your bot. You can block specific users, or use whitelist mode to allow only specific users.
+
+## Blacklist Object
+
+The blacklist is available in two contexts:
+
+1. **In flows** - via the `blacklist` parameter in callback functions
+2. **In HTTP endpoints** - via `bot.blacklist` in `handleCtx`
+
+```typescript
+type DynamicBlacklist = {
+  add: (phoneNumbers: string | string[]) => string[]
+  remove: (phoneNumber: string) => void
+  checkIf: (phoneNumber: string) => boolean
+  getList: () => string[]
+}
+```
+
+## Methods
+
+### add()
+
+Add one or more phone numbers to the blacklist.
+
+```typescript
+add(phoneNumbers: string | string[]): string[]
+```
+
+<ParamField path="phoneNumbers" type="string | string[]" required>
+  Single phone number or array of phone numbers to block
+</ParamField>
+
+<ResponseField name="return" type="string[]">
+  Array of status messages indicating the result of each operation
+</ResponseField>
+
+**Examples:**
+
+```typescript
+// Add single number
+blacklist.add('1234567890')
+// Returns: ['Número 1234567890 añadido exitosamente.']
+
+// Add multiple numbers
+blacklist.add(['1234567890', '0987654321'])
+// Returns: [
+//   'Número 1234567890 añadido exitosamente.',
+//   'Número 0987654321 añadido exitosamente.'
+// ]
+
+// Add duplicate (already in list)
+blacklist.add('1234567890')
+// Returns: ['El número de teléfono 1234567890 ya está en la lista negra.']
+```
+
+### remove()
+
+Remove a phone number from the blacklist.
+
+```typescript
+remove(phoneNumber: string): void
+```
+
+<ParamField path="phoneNumber" type="string" required>
+  Phone number to remove from the blacklist
+</ParamField>
+
+<ResponseField name="return" type="void">
+  Returns nothing. Throws an error if the number is not in the blacklist
+</ResponseField>
+
+**Examples:**
+
+```typescript
+// Remove number from blacklist
+blacklist.remove('1234567890')
+
+// Try to remove number not in list (throws error)
+try {
+  blacklist.remove('9999999999')
+} catch (error) {
+  console.error(error.message)
+  // 'El número de teléfono 9999999999 no está en la lista negra.'
+}
+```
+
+### checkIf()
+
+Check if a phone number is blocked.
+
+```typescript
+checkIf(phoneNumber: string): boolean
+```
+
+<ParamField path="phoneNumber" type="string" required>
+  Phone number to check
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the number is blocked, `false` otherwise
+</ResponseField>
+
+**Examples:**
+
+```typescript
+// Check if number is blocked
+if (blacklist.checkIf('1234567890')) {
+  console.log('This number is blocked')
+}
+
+// In whitelist mode (explained below)
+// Returns true for numbers NOT in the list
+```
+
+### getList()
+
+Get the complete list of blacklisted numbers.
+
+```typescript
+getList(): string[]
+```
+
+<ResponseField name="return" type="string[]">
+  Array of all phone numbers in the blacklist
+</ResponseField>
+
+**Examples:**
+
+```typescript
+const blockedNumbers = blacklist.getList()
+console.log(blockedNumbers)
+// ['1234567890', '0987654321']
+```
+
+## Usage Examples
+
+### In Flow Callbacks
+
+```typescript
+const adminFlow = addKeyword('admin')
+  .addAnswer(
+    'This is admin only area',
+    null,
+    async (ctx, { blacklist, flowDynamic }) => {
+      const adminNumbers = ['1111111111', '2222222222']
+      
+      if (!adminNumbers.includes(ctx.from)) {
+        blacklist.add(ctx.from)
+        await flowDynamic('Access denied. You have been blocked.')
+        return
+      }
+      
+      await flowDynamic('Welcome admin!')
+    }
+  )
+```
+
+### HTTP Endpoint for Blacklist Management
+
+```typescript
+// Add to blacklist
+adapterProvider.server.post(
+  '/v1/blacklist',
+  handleCtx(async (bot, req, res) => {
+    const { number, intent } = req.body
+    
+    if (intent === 'add') {
+      bot.blacklist.add(number)
+    }
+    
+    if (intent === 'remove') {
+      bot.blacklist.remove(number)
+    }
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    return res.end(JSON.stringify({ status: 'ok', number, intent }))
+  })
+)
+
+// Get blacklist
+adapterProvider.server.get(
+  '/v1/blacklist/list',
+  handleCtx(async (bot, req, res) => {
+    const blacklist = bot.blacklist.getList()
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    return res.end(JSON.stringify({ status: 'ok', blacklist }))
+  })
+)
+```
+
+### Auto-Block Spam Users
+
+```typescript
+const spamDetectionFlow = addKeyword('*')
+  .addAction(async (ctx, { blacklist, state, flowDynamic }) => {
+    const messageCount = state.get('messageCount') || 0
+    const newCount = messageCount + 1
+    
+    await state.update({ messageCount: newCount })
+    
+    // Block if more than 10 messages in quick succession
+    if (newCount > 10) {
+      blacklist.add(ctx.from)
+      await flowDynamic('You have been blocked for spamming.')
+    }
+  })
+```
+
+## Whitelist Mode
+
+You can use whitelist mode by prefixing numbers with `!`. In whitelist mode, only numbers in the list are allowed.
+
+```typescript
+// Add numbers with ! prefix for whitelist mode
+blacklist.add(['!1111111111', '!2222222222'])
+
+// Now only these numbers can use the bot
+// All other numbers will be blocked automatically
+
+// Check if number is allowed (in whitelist mode)
+blacklist.checkIf('1111111111') // false (allowed)
+blacklist.checkIf('9999999999') // true (blocked)
+```
+
+## Initial Configuration
+
+You can set initial blacklist numbers when creating the bot:
+
+```typescript
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: adapterProvider,
+  database: adapterDB,
+  blackList: ['1234567890', '0987654321'] // Initial blocked numbers
+})
+```
+
+## Important Notes
+
+- Blacklisted users will not trigger any flows or receive any messages
+- The blacklist is checked before any flow processing occurs
+- Whitelist mode is activated automatically when any number starts with `!`
+- The blacklist is stored in memory and will be reset when the bot restarts
+- For persistent blacklisting, store the list in your database and reload on startup
+
+## Related Methods
+
+- [state](/api/bot/state) - Manage user-specific state
+- [globalState](/api/methods/global-state) - Manage global bot state
+
+## See Also
+
+- [HTTP Server](/guides/http-server) - Creating HTTP endpoints
+- [Security Best Practices](/guides/security) - Bot security guidelines

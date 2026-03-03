@@ -1,0 +1,212 @@
+---
+title: Conversation State
+description: Per-user state management for conversation flows
+---
+
+Conversation state allows you to store data specific to each user's conversation. Each user has their own isolated state.
+
+## Usage
+
+```javascript
+const flow = addKeyword('start')
+  .addAnswer('What is your name?', { capture: true }, async (ctx, { state, flowDynamic }) => {
+    // Save user input to state
+    await state.update({ name: ctx.body })
+    
+    // Read from state
+    const name = state.get('name')
+    await flowDynamic(`Hello ${name}!`)
+  })
+```
+
+## Methods
+
+<ResponseField name="update" type="function">
+  Updates the conversation state for the current user.
+  
+  **Parameters:**
+  - `keyValue` (object): Key-value pairs to merge into the user's state
+  
+  **Returns:** `Promise<void>`
+  
+  ```javascript
+  await state.update({
+    step: 2,
+    answers: ['pizza', 'pasta']
+  })
+  ```
+</ResponseField>
+
+<ResponseField name="get" type="function">
+  Retrieves a specific value from the user's state. Supports nested properties using dot notation.
+  
+  **Parameters:**
+  - `prop` (string): Property name or path (e.g., "user.preferences.theme")
+  
+  **Returns:** `any`
+  
+  ```javascript
+  const userName = state.get('name')
+  const theme = state.get('preferences.theme')
+  ```
+</ResponseField>
+
+<ResponseField name="getMyState" type="function">
+  Returns the entire state object for the current user.
+  
+  **Returns:** `object`
+  
+  ```javascript
+  const userState = state.getMyState()
+  console.log(userState)
+  ```
+</ResponseField>
+
+<ResponseField name="clear" type="function">
+  Clears all state data for the current user.
+  
+  **Returns:** `void`
+  
+  ```javascript
+  state.clear()
+  ```
+</ResponseField>
+
+## Examples
+
+### Multi-step Form
+
+```javascript
+const registerFlow = addKeyword('register')
+  .addAnswer(
+    'What is your name?',
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ name: ctx.body })
+    }
+  )
+  .addAnswer(
+    'What is your email?',
+    { capture: true },
+    async (ctx, { state, flowDynamic }) => {
+      await state.update({ email: ctx.body })
+      
+      const { name, email } = state.getMyState()
+      await flowDynamic([
+        'Registration complete!',
+        `Name: ${name}`,
+        `Email: ${email}`
+      ])
+    }
+  )
+```
+
+### Shopping Cart
+
+```javascript
+const shopFlow = addKeyword('shop')
+  .addAnswer(
+    'Select an item: pizza, burger, salad',
+    { capture: true },
+    async (ctx, { state, flowDynamic }) => {
+      const cart = state.get('cart') || []
+      cart.push(ctx.body)
+      await state.update({ cart })
+      
+      await flowDynamic(`Added ${ctx.body} to cart. Total items: ${cart.length}`)
+    }
+  )
+
+const cartFlow = addKeyword('cart')
+  .addAnswer(null, null, async (ctx, { state, flowDynamic }) => {
+    const cart = state.get('cart') || []
+    
+    if (cart.length === 0) {
+      return flowDynamic('Your cart is empty')
+    }
+    
+    await flowDynamic(`Your cart: ${cart.join(', ')}`)
+  })
+```
+
+### User Preferences
+
+```javascript
+const preferencesFlow = addKeyword('settings')
+  .addAnswer(
+    'Choose language: en, es, fr',
+    { capture: true },
+    async (ctx, { state, flowDynamic }) => {
+      await state.update({
+        preferences: {
+          language: ctx.body,
+          timestamp: Date.now()
+        }
+      })
+      
+      await flowDynamic(`Language set to: ${ctx.body}`)
+    }
+  )
+
+const greetFlow = addKeyword('hello')
+  .addAnswer(null, null, async (ctx, { state, flowDynamic }) => {
+    const language = state.get('preferences.language') || 'en'
+    
+    const greetings = {
+      en: 'Hello!',
+      es: 'Hola!',
+      fr: 'Bonjour!'
+    }
+    
+    await flowDynamic(greetings[language])
+  })
+```
+
+### Progress Tracking
+
+```javascript
+const courseFlow = addKeyword('course')
+  .addAnswer(
+    'Lesson 1: Introduction',
+    null,
+    async (ctx, { state }) => {
+      const progress = state.get('progress') || { completed: [] }
+      progress.completed.push('lesson1')
+      await state.update({ progress })
+    }
+  )
+  .addAnswer(
+    'Lesson 2: Advanced Topics',
+    null,
+    async (ctx, { state, flowDynamic }) => {
+      const progress = state.get('progress')
+      progress.completed.push('lesson2')
+      await state.update({ progress })
+      
+      await flowDynamic(
+        `Course ${progress.completed.length * 50}% complete`
+      )
+    }
+  )
+```
+
+## Nested State
+
+You can access nested properties using dot notation:
+
+```javascript
+await state.update({
+  user: {
+    profile: {
+      name: 'John',
+      age: 30
+    },
+    settings: {
+      notifications: true
+    }
+  }
+})
+
+const name = state.get('user.profile.name') // 'John'
+const notifications = state.get('user.settings.notifications') // true
+```

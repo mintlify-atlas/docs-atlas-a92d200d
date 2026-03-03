@@ -1,0 +1,139 @@
+---
+title: Contributing to BuilderBot
+description: Learn how to contribute to the BuilderBot project
+---
+
+## Welcome
+
+We're glad you're interested in contributing to BuilderBot! You can contribute in various ways - the main one is by sharing your knowledge and skills to improve the repository, whether by updating documentation, improving code, or reviewing pending issues.
+
+We also appreciate financial contributions, which we'll use for various purposes related to the development and maintenance of the project. [Learn more](https://opencollective.com/bot-whatsapp)
+
+## Requirements
+
+To contribute to the project, you'll need:
+
+- **Node v20 or higher** - [Download Node](https://nodejs.org/es/download/)
+- **[pnpm](https://pnpm.io/cli/install)** as package manager
+- **[VSCode](https://code.visualstudio.com/download)** - recommended code editor with useful plugins
+- **[Conventional Commits](https://marketplace.visualstudio.com/items?itemName=vivaxy.vscode-conventional-commits&ssr=false#overview)** - VSCode plugin to help create semantic commits following best practices
+
+## Getting Started
+
+### Fork the Project
+
+Before you begin, fork the project to your own GitHub account. This allows you to work on your own copy of the repository.
+
+[Fork BuilderBot](https://github.com/codigoencasa/bot-whatsapp/fork)
+
+### Clone Your Fork
+
+```bash
+git clone https://github.com/YOUR_USERNAME/bot-whatsapp
+```
+
+### Install Dependencies
+
+Navigate to the project folder and install the necessary dependencies:
+
+```bash
+cd bot-whatsapp
+pnpm install
+```
+
+### Build the Project
+
+Compile the application. This will generate a `lib` directory within the monorepo packages:
+
+```bash
+pnpm run build
+```
+
+### Create Example App
+
+Run the CLI (Command Line Interface) to create an example bot:
+
+```bash
+pnpm run cli
+```
+
+Use the arrow keys to select the provider and database you want to use, marking your selections with the space bar.
+
+This process will create a subdirectory with the name of the provider and database you selected, for example: `base-bailey-mysql`
+
+### Configure Example App
+
+Within that directory, edit the `package.json` file and remove the following lines:
+
+```json
+"@bot-whatsapp/bot": "latest",
+"@bot-whatsapp/cli": "latest",
+"@bot-whatsapp/database": "latest",
+"@bot-whatsapp/provider": "latest",
+```
+
+### Run Example App
+
+Navigate to the newly created directory:
+
+```bash
+cd base-baileys-mysql
+```
+
+Run the following commands:
+
+```bash
+npm install
+npm run pre-copy
+npm start
+```
+
+### Database Configuration
+
+For MySQL and MongoDB, you'll need to specify connection data in the `app.js` file. For example, for MySQL:
+
+```js
+const BaileysProvider = require('@bot-whatsapp/provider/baileys')
+const MySQLAdapter = require('@bot-whatsapp/database/mysql')
+
+/**
+ * Declare MySQL connections
+ */
+const MYSQL_DB_HOST = 'localhost'
+const MYSQL_DB_USER = 'usr'
+const MYSQL_DB_PASSWORD = 'pass'
+const MYSQL_DB_NAME = 'bot'
+```
+
+## Running Tests
+
+All changes must pass end-to-end tests:
+
+```bash
+pnpm run test.e2e
+```
+
+## Code of Conduct
+
+We are committed to providing a welcoming and inclusive environment. By participating in this project, you agree to abide by our Code of Conduct:
+
+- Demonstrate empathy and kindness toward other people
+- Be respectful of differing opinions, viewpoints, and experiences
+- Give and gracefully accept constructive feedback
+- Accept responsibility and apologize for mistakes
+- Focus on what is best for the overall community
+
+Instances of unacceptable behavior may be reported to the community leaders at leifer.contacto@gmail.com.
+
+## Need Help?
+
+<Note>
+If you find information that could be improved in this guide or any spelling errors, feel free to [edit it directly](https://github.com/codigoencasa/bot-whatsapp/edit/dev/CONTRIBUTING.md).
+</Note>
+
+## Community
+
+- [Discord](https://link.codigoencasa.com/DISCORD)
+- [Twitter](https://twitter.com/leifermendez)
+- [YouTube](https://www.youtube.com/watch?v=5lEMCeWEJ8o&list=PL_WGMLcL4jzWPhdhcUyhbFU6bC0oJd2BR)
+- [Telegram](https://t.me/leifermendez)

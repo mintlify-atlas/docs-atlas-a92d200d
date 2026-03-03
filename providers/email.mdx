@@ -1,0 +1,159 @@
+---
+title: Email Provider
+description: Email-based chatbot interactions
+---
+
+The Email provider enables building conversational interfaces through email, allowing users to interact with your bot via their email client.
+
+## Features
+
+- Email sending and receiving
+- HTML and plain text support
+- Attachment handling
+- Thread management
+- SMTP integration
+- IMAP/POP3 support
+- Template support
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-email
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { EmailProvider } from '@builderbot/provider-email'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(EmailProvider, {
+  smtpHost: 'smtp.gmail.com',
+  smtpPort: 587,
+  smtpUser: 'your-email@gmail.com',
+  smtpPassword: 'your-app-password',
+  imapHost: 'imap.gmail.com',
+  imapPort: 993,
+  imapUser: 'your-email@gmail.com',
+  imapPassword: 'your-app-password'
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Environment Variables
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+IMAP_HOST=imap.gmail.com
+IMAP_PORT=993
+IMAP_USER=your-email@gmail.com
+IMAP_PASSWORD=your-app-password
+```
+
+## Basic Usage
+
+### Sending Emails
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hello', 'hi'])
+  .addAnswer('Hello! Thank you for your email.')
+  .addAnswer('How can we assist you today?')
+```
+
+### HTML Emails
+
+```typescript
+const htmlFlow = addKeyword('info')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendMessage(ctx.from, {
+      html: '<h1>Welcome!</h1><p>This is an HTML email.</p>'
+    })
+  })
+```
+
+## Attachments
+
+### Sending Attachments
+
+```typescript
+const attachmentFlow = addKeyword('document')
+  .addAnswer('Here is the requested document:', {
+    media: './path/to/document.pdf'
+  })
+```
+
+### Receiving Attachments
+
+```typescript
+const receiveAttachmentFlow = addKeyword('ATTACHMENT')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    const filePath = await provider.saveFile(ctx, {
+      path: './downloads'
+    })
+    await flowDynamic(`Received attachment: ${filePath}`)
+  })
+```
+
+## Gmail Configuration
+
+### App Passwords
+
+For Gmail, use App Passwords:
+
+1. Enable 2-Factor Authentication on your Google account
+2. Go to Google Account > Security > App passwords
+3. Generate an app password for "Mail"
+4. Use this password in your configuration
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Email Security">
+    - Use app-specific passwords
+    - Enable SSL/TLS
+    - Don't store passwords in code
+    - Use environment variables
+  </Accordion>
+
+  <Accordion title="Deliverability">
+    - Verify your domain
+    - Use proper sender addresses
+    - Avoid spam triggers
+    - Implement DKIM and SPF
+  </Accordion>
+
+  <Accordion title="Performance">
+    - Poll inbox at reasonable intervals
+    - Clean up old emails
+    - Limit attachment sizes
+    - Use connection pooling
+  </Accordion>
+</AccordionGroup>
+
+## Supported Email Services
+
+- Gmail
+- Outlook/Office 365
+- Yahoo Mail
+- Custom SMTP/IMAP servers
+
+## Further Resources
+
+- [Nodemailer Documentation](https://nodemailer.com)
+- [IMAP Protocol](https://tools.ietf.org/html/rfc3501)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

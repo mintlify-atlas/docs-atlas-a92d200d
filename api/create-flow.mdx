@@ -1,0 +1,162 @@
+---
+title: 'createFlow'
+description: 'Create a flow instance containing conversation flows for your bot'
+---
+
+## Overview
+
+The `createFlow` function creates a flow instance that manages all conversation flows for your bot. Flows are created using `addKeyword()` and can be nested and chained together.
+
+## Function Signature
+
+<CodeGroup>
+```typescript TypeScript
+const createFlow = (args: TFlow[]): FlowClass
+```
+
+```javascript JavaScript
+const createFlow = (args)
+```
+</CodeGroup>
+
+## Parameters
+
+<ParamField path="args" type="TFlow[]" required>
+  Array of flow objects created with `addKeyword()`. Each flow represents a conversation path or trigger.
+</ParamField>
+
+## Return Value
+
+<ResponseField name="flowInstance" type="FlowClass">
+  Returns a FlowClass instance containing all registered conversation flows.
+</ResponseField>
+
+## Usage Examples
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createFlow, addKeyword } from '@builderbot/bot'
+
+    const welcomeFlow = addKeyword(['hello', 'hi'])
+      .addAnswer('Welcome! How can I help you?')
+
+    const helpFlow = addKeyword('help')
+      .addAnswer('Here are the available commands...')
+
+    const adapterFlow = createFlow([welcomeFlow, helpFlow])
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createFlow, addKeyword } = require('@builderbot/bot')
+
+    const welcomeFlow = addKeyword(['hello', 'hi'])
+      .addAnswer('Welcome! How can I help you?')
+
+    const helpFlow = addKeyword('help')
+      .addAnswer('Here are the available commands...')
+
+    const adapterFlow = createFlow([welcomeFlow, helpFlow])
+    ```
+  </Tab>
+</Tabs>
+
+### Empty Flow
+
+You can create an empty flow and add flows dynamically:
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createFlow } from '@builderbot/bot'
+
+    // Create empty flow
+    const adapterFlow = createFlow([])
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createFlow } = require('@builderbot/bot')
+
+    // Create empty flow
+    const adapterFlow = createFlow([])
+    ```
+  </Tab>
+</Tabs>
+
+### Complex Flow with Multiple Triggers
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createFlow, addKeyword } from '@builderbot/bot'
+
+    const orderFlow = addKeyword(['order', 'buy', 'purchase'])
+      .addAnswer('What would you like to order?', { capture: true },
+        async (ctx, { flowDynamic }) => {
+          await flowDynamic(`You want to order: ${ctx.body}`)
+        }
+      )
+
+    const trackingFlow = addKeyword(['track', 'status'])
+      .addAnswer('Please provide your order number:', { capture: true },
+        async (ctx, { flowDynamic }) => {
+          await flowDynamic(`Tracking order: ${ctx.body}`)
+        }
+      )
+
+    const supportFlow = addKeyword(['support', 'help', 'issue'])
+      .addAnswer('How can we assist you today?')
+
+    const adapterFlow = createFlow([
+      orderFlow,
+      trackingFlow,
+      supportFlow
+    ])
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createFlow, addKeyword } = require('@builderbot/bot')
+
+    const orderFlow = addKeyword(['order', 'buy', 'purchase'])
+      .addAnswer('What would you like to order?', { capture: true },
+        async (ctx, { flowDynamic }) => {
+          await flowDynamic(`You want to order: ${ctx.body}`)
+        }
+      )
+
+    const trackingFlow = addKeyword(['track', 'status'])
+      .addAnswer('Please provide your order number:', { capture: true },
+        async (ctx, { flowDynamic }) => {
+          await flowDynamic(`Tracking order: ${ctx.body}`)
+        }
+      )
+
+    const supportFlow = addKeyword(['support', 'help', 'issue'])
+      .addAnswer('How can we assist you today?')
+
+    const adapterFlow = createFlow([
+      orderFlow,
+      trackingFlow,
+      supportFlow
+    ])
+    ```
+  </Tab>
+</Tabs>
+
+## Notes
+
+- Flows are independent conversation paths that are triggered by keywords
+- Multiple flows can be active simultaneously for different users
+- The order of flows in the array doesn't affect their priority
+- Each flow maintains its own state and execution context
+
+## Related
+
+- [addKeyword](/api/add-keyword) - Create a new conversation flow
+- [createBot](/api/create-bot) - Initialize the bot with flows

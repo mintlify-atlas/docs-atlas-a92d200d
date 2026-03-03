@@ -1,0 +1,465 @@
+---
+title: MySQL Adapter
+description: Use MySQL for robust, relational conversation storage
+---
+
+The MySQL adapter provides a production-ready relational database solution for BuilderBot. Perfect for applications that need ACID transactions, structured data, and traditional SQL databases.
+
+## Installation
+
+```bash
+npm install @builderbot/database-mysql
+```
+
+The adapter uses `mysql2` (v3.15+), which is included as a dependency.
+
+## Basic Usage
+
+```typescript
+import { createBot, createFlow, createProvider } from '@builderbot/bot'
+import { MysqlAdapter as Database } from '@builderbot/database-mysql'
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterDB = new Database({
+    host: process.env.MYSQL_DB_HOST,
+    user: process.env.MYSQL_DB_USER,
+    database: process.env.MYSQL_DB_NAME,
+    password: process.env.MYSQL_DB_PASSWORD,
+    port: 3306
+  })
+  
+  await createBot({
+    flow: createFlow([]),
+    provider: createProvider(Provider),
+    database: adapterDB
+  })
+}
+
+main()
+```
+
+## Configuration
+
+<ParamField path="host" type="string" required>
+  MySQL server hostname or IP address.
+  
+  **Examples**: `localhost`, `127.0.0.1`, `mysql.example.com`
+</ParamField>
+
+<ParamField path="user" type="string" required>
+  MySQL username for authentication.
+</ParamField>
+
+<ParamField path="database" type="string" required>
+  Name of the database to use.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  Password for the MySQL user.
+</ParamField>
+
+<ParamField path="port" type="number">
+  MySQL server port.
+  
+  **Default**: `3306`
+</ParamField>
+
+## Connection Examples
+
+<CodeGroup>
+```typescript Local MySQL
+import { MysqlAdapter } from '@builderbot/database-mysql'
+
+const adapterDB = new MysqlAdapter({
+  host: 'localhost',
+  user: 'root',
+  database: 'builderbot',
+  password: 'password',
+  port: 3306
+})
+```
+
+```typescript Remote MySQL
+import { MysqlAdapter } from '@builderbot/database-mysql'
+
+const adapterDB = new MysqlAdapter({
+  host: 'mysql.example.com',
+  user: 'bot_user',
+  database: 'chatbot_prod',
+  password: 'secure_password',
+  port: 3306
+})
+```
+
+```typescript Environment Variables
+import { MysqlAdapter } from '@builderbot/database-mysql'
+
+const adapterDB = new MysqlAdapter({
+  host: process.env.MYSQL_DB_HOST,
+  user: process.env.MYSQL_DB_USER,
+  database: process.env.MYSQL_DB_NAME,
+  password: process.env.MYSQL_DB_PASSWORD,
+  port: Number(process.env.MYSQL_DB_PORT) || 3306
+})
+```
+</CodeGroup>
+
+## Environment Variables
+
+Create a `.env` file:
+
+```bash .env
+MYSQL_DB_HOST=localhost
+MYSQL_DB_USER=builderbot_user
+MYSQL_DB_NAME=builderbot
+MYSQL_DB_PASSWORD=your_secure_password
+MYSQL_DB_PORT=3306
+```
+
+Load it in your application:
+
+```typescript
+import 'dotenv/config'
+import { MysqlAdapter } from '@builderbot/database-mysql'
+
+const adapterDB = new MysqlAdapter({
+  host: process.env.MYSQL_DB_HOST,
+  user: process.env.MYSQL_DB_USER,
+  database: process.env.MYSQL_DB_NAME,
+  password: process.env.MYSQL_DB_PASSWORD,
+  port: Number(process.env.MYSQL_DB_PORT) || 3306
+})
+```
+
+## Database Schema
+
+The adapter automatically creates the `history` table on first connection:
+
+```sql
+CREATE TABLE history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ref VARCHAR(255) DEFAULT NULL,
+  keyword VARCHAR(255) NULL,
+  answer LONGTEXT NULL,
+  refSerialize VARCHAR(255) NULL,
+  phone VARCHAR(255) NOT NULL,
+  options LONGTEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_General_ci;
+```
+
+### Table Structure
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INT AUTO_INCREMENT | Primary key, auto-incremented |
+| `ref` | VARCHAR(255) | Flow reference |
+| `keyword` | VARCHAR(255) | Trigger keyword |
+| `answer` | LONGTEXT | User's response/message content |
+| `refSerialize` | VARCHAR(255) | Serialized flow state |
+| `phone` | VARCHAR(255) | User's phone number |
+| `options` | LONGTEXT | JSON-encoded flow options |
+| `created_at` | TIMESTAMP | Auto-generated timestamp |
+
+<Note>
+  The table uses `utf8mb4` character set to support emojis and special characters in messages.
+</Note>
+
+## Auto-Migration
+
+The adapter automatically checks if the `history` table exists and creates it if needed:
+
+```typescript packages/database-mysql/src/mysqlAdapter.ts
+checkTableExists = (): Promise<boolean> =>
+  new Promise((resolve) => {
+    const sql = "SHOW TABLES LIKE 'history'"
+    this.db.query(sql, (err, rows) => {
+      if (err) throw err
+      if (!rows.length) {
+        this.createTable()  // Auto-create table
+      }
+      resolve(!!rows.length)
+    })
+  })
+```
+
+No manual migration required!
+
+## MySQL Setup
+
+### 1. Install MySQL
+
+<CodeGroup>
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install mysql-server
+sudo systemctl start mysql
+sudo systemctl enable mysql
+```
+
+```bash macOS (Homebrew)
+brew install mysql
+brew services start mysql
+```
+
+```bash Windows
+# Download from https://dev.mysql.com/downloads/installer/
+# Run the installer and follow the wizard
+```
+</CodeGroup>
+
+### 2. Create Database and User
+
+```sql
+-- Connect to MySQL as root
+mysql -u root -p
+
+-- Create database
+CREATE DATABASE builderbot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Create user
+CREATE USER 'builderbot_user'@'localhost' IDENTIFIED BY 'your_password';
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON builderbot.* TO 'builderbot_user'@'localhost';
+FLUSH PRIVILEGES;
+
+-- Exit
+EXIT;
+```
+
+### 3. Test Connection
+
+```bash
+mysql -u builderbot_user -p builderbot
+```
+
+## Implementation Details
+
+### Save Method
+
+```typescript packages/database-mysql/src/mysqlAdapter.ts
+save = async (ctx): Promise<void> => {
+  const values = [[
+    ctx.ref,
+    ctx.keyword,
+    ctx.answer,
+    ctx.refSerialize,
+    ctx.from,
+    JSON.stringify(ctx.options)
+  ]]
+  const sql = 'INSERT INTO history (ref, keyword, answer, refSerialize, phone, options) VALUES ?'
+  
+  this.db.query(sql, [values], (err) => {
+    if (err) throw err
+  })
+}
+```
+
+### Get Previous Entry
+
+```typescript packages/database-mysql/src/mysqlAdapter.ts
+getPrevByNumber = async (from: string): Promise<HistoryRow> => {
+  return new Promise((resolve, reject) => {
+    const sql = `SELECT * FROM history WHERE phone='${from}' ORDER BY id DESC`
+    this.db.query(sql, (error, rows) => {
+      if (error) reject(error)
+      if (rows.length) {
+        const [row] = rows
+        row.options = JSON.parse(row.options)  // Parse JSON options
+        resolve(row)
+      } else {
+        resolve({} as HistoryRow)
+      }
+    })
+  })
+}
+```
+
+## Indexes for Performance
+
+Add indexes to improve query performance:
+
+```sql
+-- Index on phone numbers (most common query)
+CREATE INDEX idx_phone ON history(phone);
+
+-- Index on created_at for time-based queries
+CREATE INDEX idx_created_at ON history(created_at);
+
+-- Composite index for phone + created_at
+CREATE INDEX idx_phone_created ON history(phone, created_at DESC);
+```
+
+## TypeScript Support
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+import { MysqlAdapter } from '@builderbot/database-mysql'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const welcomeFlow = addKeyword<BaileysProvider, MysqlAdapter>(['hello'])
+  .addAnswer('Hi! How can I help you?')
+```
+
+## Querying Data
+
+Access the raw database connection for custom queries:
+
+```typescript
+import { MysqlAdapter } from '@builderbot/database-mysql'
+
+const adapterDB = new MysqlAdapter({ /* credentials */ })
+
+// Wait for connection
+setTimeout(() => {
+  // Custom query
+  adapterDB.db.query(
+    'SELECT COUNT(*) as total FROM history WHERE phone = ?',
+    ['1234567890'],
+    (err, results) => {
+      if (err) throw err
+      console.log('Total messages:', results[0].total)
+    }
+  )
+}, 2000)
+```
+
+## Connection Pooling
+
+For high-traffic applications, consider using connection pooling:
+
+```typescript
+import mysql from 'mysql2'
+import { MemoryDB } from '@builderbot/bot'
+
+// Create pool instead of single connection
+const pool = mysql.createPool({
+  host: process.env.MYSQL_DB_HOST,
+  user: process.env.MYSQL_DB_USER,
+  database: process.env.MYSQL_DB_NAME,
+  password: process.env.MYSQL_DB_PASSWORD,
+  port: 3306,
+  connectionLimit: 10,      // Max connections
+  queueLimit: 0,            // Unlimited queue
+  waitForConnections: true  // Wait if all connections busy
+})
+
+// Use pool in adapter (requires custom implementation)
+```
+
+<Note>
+  The current adapter uses a single connection. For production, you may want to modify it to use connection pooling.
+</Note>
+
+## Backup and Restore
+
+### Using mysqldump
+
+```bash
+# Backup
+mysqldump -u builderbot_user -p builderbot > backup.sql
+
+# Backup specific table
+mysqldump -u builderbot_user -p builderbot history > history_backup.sql
+
+# Restore
+mysql -u builderbot_user -p builderbot < backup.sql
+```
+
+### Automated Backups
+
+Create a cron job for daily backups:
+
+```bash
+# Add to crontab (crontab -e)
+0 2 * * * mysqldump -u builderbot_user -p'password' builderbot > /backups/builderbot_$(date +\%Y\%m\%d).sql
+```
+
+## Remote Access Configuration
+
+To allow remote connections:
+
+1. Edit MySQL config:
+
+```bash
+sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+```
+
+2. Change bind-address:
+
+```ini
+# bind-address = 127.0.0.1
+bind-address = 0.0.0.0
+```
+
+3. Restart MySQL:
+
+```bash
+sudo systemctl restart mysql
+```
+
+4. Grant remote access:
+
+```sql
+CREATE USER 'builderbot_user'@'%' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON builderbot.* TO 'builderbot_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+<Warning>
+  Only allow remote access from trusted IPs in production. Use firewall rules to restrict access.
+</Warning>
+
+## Troubleshooting
+
+### Connection Refused
+
+```
+Error: connect ECONNREFUSED 127.0.0.1:3306
+```
+
+**Solutions**:
+- Check if MySQL is running: `sudo systemctl status mysql`
+- Verify port: `sudo netstat -tlnp | grep 3306`
+- Check bind-address in MySQL config
+
+### Access Denied
+
+```
+Error: Access denied for user 'user'@'host'
+```
+
+**Solutions**:
+- Verify username and password
+- Check user privileges: `SHOW GRANTS FOR 'user'@'host';`
+- Ensure user can connect from your host
+
+### Table Already Exists Error
+
+The adapter creates tables automatically. If you see errors, check:
+- User has CREATE TABLE privileges
+- Database exists
+- Character set is supported
+
+## Best Practices
+
+<Check>Use environment variables for credentials</Check>
+<Check>Create dedicated database user with limited privileges</Check>
+<Check>Enable SSL/TLS for remote connections</Check>
+<Check>Add indexes on frequently queried columns</Check>
+<Check>Set up automated backups</Check>
+<Check>Monitor slow queries</Check>
+<Check>Use connection pooling for high traffic</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="key" href="/deployment/environment">
+    Secure your database credentials
+  </Card>
+  <Card title="PostgreSQL" icon="database" href="/databases/postgresql">
+    Compare with PostgreSQL features
+  </Card>
+</CardGroup>

@@ -1,0 +1,405 @@
+---
+title: Queue System
+description: Understand how BuilderBot manages message ordering and concurrency
+---
+
+BuilderBot uses a sophisticated queue system to ensure messages are sent in the correct order and to prevent rate limiting from WhatsApp. Understanding the queue helps you build more reliable bots.
+
+## How the Queue Works
+
+Every message sent by the bot goes through a queue system that:
+
+1. **Maintains order** - Messages are sent in the sequence they were queued
+2. **Prevents duplicates** - The same message won't be sent twice
+3. **Handles timeouts** - Messages that take too long are automatically handled
+4. **Supports concurrency** - Multiple messages can be processed simultaneously
+
+## Queue Architecture
+
+The queue system maintains separate queues for each user:
+
+```javascript
+// Internally, the queue looks like this:
+{
+  '1234567890': [message1, message2, message3],  // User 1's queue
+  '0987654321': [message1, message2],            // User 2's queue
+}
+```
+
+<Note>
+  Each user (identified by phone number) has their own independent queue. This means messages to different users don't interfere with each other.
+</Note>
+
+## Queue Configuration
+
+Configure queue behavior when creating your bot:
+
+```javascript
+const { httpServer } = await createBot(
+    {
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    },
+    {
+        queue: {
+            timeout: 50000,        // Timeout in ms (default: 50000)
+            concurrencyLimit: 15   // Max concurrent messages (default: 15)
+        }
+    }
+)
+```
+
+### Configuration Options
+
+<Accordion title="timeout">
+  Maximum time (in milliseconds) to wait for a message to be sent before timing out.
+
+  ```javascript
+  queue: {
+      timeout: 30000  // 30 seconds
+  }
+  ```
+
+  **Default:** 50000 (50 seconds)
+  
+  **When to adjust:** Increase for slow networks or large media files. Decrease for faster failure detection.
+</Accordion>
+
+<Accordion title="concurrencyLimit">
+  Maximum number of messages that can be processed simultaneously for each user.
+
+  ```javascript
+  queue: {
+      concurrencyLimit: 5  // Process up to 5 messages at once
+  }
+  ```
+
+  **Default:** 15
+  
+  **When to adjust:** Increase for faster message delivery. Decrease to avoid rate limiting or if you experience sending issues.
+</Accordion>
+
+## Queue Lifecycle
+
+<Steps>
+  <Step title="Message enters queue">
+    When a message is triggered, it's added to the user's queue:
+    ```javascript
+    const flow = addKeyword('hello')
+        .addAnswer('Message 1')  // Queued
+        .addAnswer('Message 2')  // Queued
+        .addAnswer('Message 3')  // Queued
+    ```
+  </Step>
+
+  <Step title="Queue processes messages">
+    Messages are processed based on concurrency limit:
+    ```
+    If concurrencyLimit = 3:
+    - Message 1, 2, 3 process simultaneously
+    - Message 4, 5, 6 wait
+    - As 1, 2, 3 complete, 4, 5, 6 start
+    ```
+  </Step>
+
+  <Step title="Messages are sent">
+    Each message is sent to WhatsApp and marked as complete.
+  </Step>
+
+  <Step title="Queue clears">
+    When all messages are sent, the queue for that user becomes empty.
+  </Step>
+</Steps>
+
+## Queue Methods
+
+Access queue methods in flow callbacks:
+
+### clearQueue
+
+Clear all pending messages for a user:
+
+```javascript
+const cancelFlow = addKeyword('cancel')
+    .addAction(async (ctx, { queue, flowDynamic }) => {
+        queue.clearQueue(ctx.from)
+        await flowDynamic('All pending messages cancelled')
+    })
+```
+
+### Accessing Queue State
+
+The queue object is available in callbacks:
+
+```javascript
+const debugFlow = addKeyword('debug')
+    .addAction(async (ctx, { queue, flowDynamic }) => {
+        const pendingIds = queue.getIdsCallback(ctx.from)
+        await flowDynamic(`Pending messages: ${pendingIds.length}`)
+    })
+```
+
+## Handling Queue Issues
+
+### Duplicate Prevention
+
+The queue automatically prevents duplicate messages:
+
+```javascript
+// Even if triggered multiple times, this message sends only once
+const flow = addKeyword('test')
+    .addAnswer('This message', { ref: 'unique-ref-123' })
+```
+
+<Note>
+  Each message has a unique reference ID. If the same reference is queued twice, the duplicate is ignored.
+</Note>
+
+### Timeout Handling
+
+Messages that exceed the timeout are automatically resolved:
+
+```javascript
+// If this takes longer than queue.timeout, it will timeout
+const slowFlow = addKeyword('slow')
+    .addAction(async (ctx, { flowDynamic }) => {
+        // Simulate slow operation
+        await slowOperation()  // If > 50s, triggers timeout
+        await flowDynamic('Done!')
+    })
+```
+
+## Queue in Different Scenarios
+
+### Sequential Messages
+
+Messages are queued and sent in order:
+
+```javascript
+const flow = addKeyword('story')
+    .addAnswer('Chapter 1...', { delay: 1000 })
+    .addAnswer('Chapter 2...', { delay: 1000 })
+    .addAnswer('Chapter 3...', { delay: 1000 })
+    .addAnswer('The End!')
+```
+
+**Queue behavior:**
+```
+Time 0s:  Queue: [Ch1, Ch2, Ch3, End]
+Time 1s:  Send Ch1, Queue: [Ch2, Ch3, End]
+Time 2s:  Send Ch2, Queue: [Ch3, End]
+Time 3s:  Send Ch3, Queue: [End]
+Time 3s:  Send End, Queue: []
+```
+
+### Concurrent Processing
+
+With `concurrencyLimit: 15`, up to 15 messages process simultaneously:
+
+```javascript
+const catalogFlow = addKeyword('catalog')
+    .addAction(async (ctx, { flowDynamic }) => {
+        const products = await getProducts()  // Returns 20 products
+        
+        for (const product of products) {
+            await flowDynamic([
+                { body: product.name, media: product.image }
+            ])
+        }
+    })
+```
+
+**Queue behavior:**
+```
+Time 0s:  Queue: [P1, P2, ..., P20]
+Time 0s:  Processing: [P1, P2, ..., P15]  (15 concurrent)
+Time 1s:  P1-P15 complete, start P16-P20
+Time 2s:  All complete, Queue: []
+```
+
+### Force Queue Mode
+
+Force all messages through the queue even during capture:
+
+```javascript
+const flow = addKeyword('test')
+    .addAnswer(
+        'Enter your name:',
+        { capture: true },
+        async (ctx, { sendFlow }) => {
+            const messages = [
+                { answer: `Hello ${ctx.body}!` },
+                { answer: 'Message 2' },
+                { answer: 'Message 3' }
+            ]
+            
+            // Force through queue
+            await sendFlow(messages, ctx.from, { forceQueue: true })
+        }
+    )
+```
+
+## Queue Logs
+
+The queue system creates detailed logs in `queue.class.log`:
+
+```bash
+# View queue logs
+tail -f queue.class.log
+```
+
+Log entries show:
+- When messages enter the queue
+- When messages start processing
+- When messages complete
+- Any errors or timeouts
+
+```
+1234567890: QUEUE: ans_abc123
+1234567890: EXECUTING: ans_abc123
+1234567890: SUCCESS: ans_abc123
+```
+
+## Best Practices
+
+<Accordion title="Avoid blocking the queue">
+  Don't perform long operations inside message callbacks:
+  
+  ```javascript
+  // BAD: Blocks the queue
+  .addAction(async (ctx, { flowDynamic }) => {
+      const data = await slowDatabaseQuery()  // Takes 30 seconds
+      await flowDynamic(data)
+  })
+  
+  // GOOD: Process async, then respond
+  .addAction(async (ctx, { flowDynamic }) => {
+      await flowDynamic('Processing...')
+      processAsync(ctx.from)  // Don't await
+  })
+  ```
+</Accordion>
+
+<Accordion title="Use appropriate concurrency">
+  Adjust based on your use case:
+  
+  ```javascript
+  // High-volume bot (many users)
+  queue: { concurrencyLimit: 5 }
+  
+  // Low-volume bot (few users, fast responses)
+  queue: { concurrencyLimit: 20 }
+  ```
+</Accordion>
+
+<Accordion title="Clear queue when ending flows">
+  Always clear the queue when ending conversations:
+  
+  ```javascript
+  const endFlow = addKeyword('end')
+      .addAction(async (ctx, { queue, endFlow }) => {
+          queue.clearQueue(ctx.from)
+          await endFlow('Conversation ended')
+      })
+  ```
+</Accordion>
+
+<Accordion title="Monitor queue logs">
+  Regularly check `queue.class.log` for issues:
+  ```bash
+  # Watch for timeouts
+  grep "timeout" queue.class.log
+  
+  # Check queue activity
+  tail -f queue.class.log
+  ```
+</Accordion>
+
+<Accordion title="Handle media files carefully">
+  Large media files can cause timeouts. Increase timeout if needed:
+  ```javascript
+  queue: {
+      timeout: 120000  // 2 minutes for large videos
+  }
+  ```
+</Accordion>
+
+## Queue vs No Queue
+
+Understanding when messages use the queue:
+
+| Scenario | Uses Queue | Notes |
+|----------|------------|-------|
+| `.addAnswer()` | Yes | Always queued |
+| `flowDynamic()` | Yes | Queued by default |
+| `sendMessage()` from API | Yes | Uses queue |
+| `endFlow()` | Yes | Clears queue after |
+| Direct provider calls | No | Bypasses queue (not recommended) |
+
+## Troubleshooting
+
+<Accordion title="Messages sending out of order">
+  This usually means you're not properly awaiting async operations:
+  
+  ```javascript
+  // BAD
+  .addAction(async (ctx, { flowDynamic }) => {
+      flowDynamic('Message 1')  // Not awaited!
+      flowDynamic('Message 2')  // Not awaited!
+  })
+  
+  // GOOD
+  .addAction(async (ctx, { flowDynamic }) => {
+      await flowDynamic('Message 1')
+      await flowDynamic('Message 2')
+  })
+  ```
+</Accordion>
+
+<Accordion title="Messages timing out">
+  Increase the timeout or optimize your operations:
+  
+  ```javascript
+  queue: {
+      timeout: 100000  // Increase to 100 seconds
+  }
+  ```
+</Accordion>
+
+<Accordion title="Queue getting stuck">
+  Check logs and manually clear if needed:
+  
+  ```javascript
+  // Emergency queue clear endpoint
+  adapterProvider.server.post('/v1/clear-queue',
+      handleCtx(async (bot, req, res) => {
+          const { number } = req.body
+          bot.queue.clearQueue(number)
+          res.end('cleared')
+      })
+  )
+  ```
+</Accordion>
+
+## Advanced: Queue Internals
+
+For advanced users, understanding the queue structure:
+
+```typescript
+class Queue<T> {
+    private queue: Map<string, QueueItem<T>[]>        // User queues
+    private timers: Map<string, NodeJS.Timeout>       // Timeouts
+    private workingOnPromise: Map<string, boolean>    // Processing state
+    
+    async enqueue(from: string, promiseFunc: () => Promise<T>, id: string)
+    async processQueue(from: string)
+    async clearQueue(from: string)
+}
+```
+
+## Next Steps
+
+- Learn about [State Management](/guides/state-management) to store queue-related data
+- Explore [Testing](/guides/testing) to test queue behavior
+- Check out [Creating Flows](/guides/creating-flows) to build queued conversations

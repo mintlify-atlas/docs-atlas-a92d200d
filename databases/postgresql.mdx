@@ -1,0 +1,584 @@
+---
+title: PostgreSQL Adapter
+description: Use PostgreSQL for advanced, feature-rich conversation storage
+---
+
+The PostgreSQL adapter provides the most advanced database solution for BuilderBot, featuring automatic contact management, stored procedures, and support for complex data relationships.
+
+## Installation
+
+```bash
+npm install @builderbot/database-postgres
+```
+
+The adapter uses the `pg` library (v8.11+), which is included as a dependency.
+
+## Basic Usage
+
+```typescript
+import { createBot, createFlow, createProvider } from '@builderbot/bot'
+import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterDB = new Database({
+    host: process.env.POSTGRES_DB_HOST,
+    user: process.env.POSTGRES_DB_USER,
+    database: process.env.POSTGRES_DB_NAME,
+    password: process.env.POSTGRES_DB_PASSWORD,
+    port: 5432
+  })
+  
+  await createBot({
+    flow: createFlow([]),
+    provider: createProvider(Provider),
+    database: adapterDB
+  })
+}
+
+main()
+```
+
+## Configuration
+
+<ParamField path="host" type="string" required>
+  PostgreSQL server hostname or IP address.
+  
+  **Examples**: `localhost`, `127.0.0.1`, `postgres.example.com`
+</ParamField>
+
+<ParamField path="user" type="string" required>
+  PostgreSQL username for authentication.
+</ParamField>
+
+<ParamField path="database" type="string" required>
+  Name of the database to use.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  Password for the PostgreSQL user.
+</ParamField>
+
+<ParamField path="port" type="number">
+  PostgreSQL server port.
+  
+  **Default**: `5432`
+</ParamField>
+
+## Connection Examples
+
+<CodeGroup>
+```typescript Local PostgreSQL
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const adapterDB = new PostgreSQLAdapter({
+  host: 'localhost',
+  user: 'postgres',
+  database: 'builderbot',
+  password: 'password',
+  port: 5432
+})
+```
+
+```typescript Remote PostgreSQL
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const adapterDB = new PostgreSQLAdapter({
+  host: 'postgres.example.com',
+  user: 'bot_user',
+  database: 'chatbot_prod',
+  password: 'secure_password',
+  port: 5432
+})
+```
+
+```typescript Environment Variables
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const adapterDB = new PostgreSQLAdapter({
+  host: process.env.POSTGRES_DB_HOST,
+  user: process.env.POSTGRES_DB_USER,
+  database: process.env.POSTGRES_DB_NAME,
+  password: process.env.POSTGRES_DB_PASSWORD,
+  port: Number(process.env.POSTGRES_DB_PORT) || 5432
+})
+```
+
+```typescript Cloud Provider (e.g., Railway, Render)
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const adapterDB = new PostgreSQLAdapter({
+  host: 'containers-us-west-123.railway.app',
+  user: 'postgres',
+  database: 'railway',
+  password: process.env.DATABASE_PASSWORD,
+  port: 5432
+})
+```
+</CodeGroup>
+
+## Environment Variables
+
+Create a `.env` file:
+
+```bash .env
+POSTGRES_DB_HOST=localhost
+POSTGRES_DB_USER=builderbot_user
+POSTGRES_DB_NAME=builderbot
+POSTGRES_DB_PASSWORD=your_secure_password
+POSTGRES_DB_PORT=5432
+```
+
+Load it in your application:
+
+```typescript
+import 'dotenv/config'
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const adapterDB = new PostgreSQLAdapter({
+  host: process.env.POSTGRES_DB_HOST,
+  user: process.env.POSTGRES_DB_USER,
+  database: process.env.POSTGRES_DB_NAME,
+  password: process.env.POSTGRES_DB_PASSWORD,
+  port: Number(process.env.POSTGRES_DB_PORT) || 5432
+})
+```
+
+## Database Schema
+
+The adapter automatically creates two tables and two stored procedures:
+
+### Tables
+
+#### `contact` Table
+
+Stores user contact information:
+
+```sql
+CREATE TABLE IF NOT EXISTS contact (
+  id SERIAL PRIMARY KEY,
+  phone VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT current_timestamp,
+  updated_in TIMESTAMP,
+  last_interaction TIMESTAMP,
+  values JSONB
+);
+```
+
+#### `history` Table
+
+Stores conversation history with foreign key to contacts:
+
+```sql
+CREATE TABLE IF NOT EXISTS history (
+  id SERIAL PRIMARY KEY,
+  ref VARCHAR(255) NOT NULL,
+  keyword VARCHAR(255),
+  answer TEXT NOT NULL,
+  refSerialize TEXT NOT NULL,
+  phone VARCHAR(255) DEFAULT NULL,
+  options JSONB,
+  created_at TIMESTAMP DEFAULT current_timestamp,
+  updated_in TIMESTAMP,
+  contact_id INTEGER REFERENCES contact(id)
+);
+```
+
+### Stored Procedures
+
+The adapter creates two stored procedures for efficient data management:
+
+#### 1. `save_or_update_contact`
+
+Saves or updates contact information:
+
+```sql
+CREATE OR REPLACE FUNCTION save_or_update_contact(
+  in_phone VARCHAR(255),
+  in_values JSONB
+)
+RETURNS VOID AS $$
+DECLARE
+  contact_id INT;
+BEGIN
+  SELECT id INTO contact_id FROM contact WHERE phone = in_phone;
+  
+  IF contact_id IS NULL THEN
+    INSERT INTO contact (phone, "values")
+    VALUES (in_phone, in_values);
+  ELSE
+    UPDATE contact SET "values" = in_values, updated_in = current_timestamp
+    WHERE id = contact_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### 2. `save_or_update_history_and_contact`
+
+Saves history entry and updates contact automatically:
+
+```sql
+CREATE OR REPLACE FUNCTION save_or_update_history_and_contact(
+  in_ref VARCHAR(255),
+  in_keyword VARCHAR(255),
+  in_answer TEXT,
+  in_refserialize TEXT,
+  in_phone VARCHAR(255),
+  in_options JSONB
+)
+RETURNS VOID AS $$
+DECLARE
+  _contact_id INT;
+BEGIN
+  SELECT id INTO _contact_id FROM contact WHERE phone = in_phone;
+  
+  IF _contact_id IS NULL THEN
+    INSERT INTO contact (phone)
+    VALUES (in_phone)
+    RETURNING id INTO _contact_id;
+  ELSE
+    UPDATE contact SET last_interaction = current_timestamp WHERE id = _contact_id;
+  END IF;
+  
+  INSERT INTO history (ref, keyword, answer, refserialize, phone, options, contact_id, created_at)
+  VALUES (in_ref, in_keyword, in_answer, in_refserialize, in_phone, in_options, _contact_id, current_timestamp);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+## Auto-Migration
+
+The adapter automatically creates all tables and stored procedures on first connection:
+
+```typescript packages/database-postgres/src/postgresAdapter.ts
+async checkTableExistsAndSP(): Promise<void> {
+  // Create contact table
+  await this.db.query(contactTableSQL)
+  
+  // Create history table
+  await this.db.query(historyTableSQL)
+  
+  // Create stored procedures
+  await this.createSP()
+}
+```
+
+No manual migration required!
+
+## Contact Management
+
+Unique to the PostgreSQL adapter, you can save and manage contact information:
+
+```typescript
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const adapterDB = new PostgreSQLAdapter({ /* credentials */ })
+
+// Save contact with custom data
+await adapterDB.saveContact({
+  from: '1234567890',
+  values: {
+    name: 'John Doe',
+    email: 'john@example.com',
+    preferences: { language: 'en', notifications: true }
+  },
+  action: 'a'  // 'a' = add/merge, 'u' = update/replace
+})
+
+// Get contact information
+const contact = await adapterDB.getContact({ from: '1234567890' })
+console.log(contact)
+// {
+//   id: 1,
+//   phone: '1234567890',
+//   created_at: '2024-03-15T10:30:00Z',
+//   last_interaction: '2024-03-15T14:20:00Z',
+//   values: { name: 'John Doe', email: 'john@example.com', ... }
+// }
+```
+
+### Contact Actions
+
+<ParamField path="action" type="string">
+  How to handle existing contact values:
+  
+  - `'a'` (default): Add/merge new values with existing ones
+  - `'u'`: Update/replace all values with new ones
+</ParamField>
+
+```typescript
+// Merge new fields (keeps existing data)
+await adapterDB.saveContact({
+  from: '1234567890',
+  values: { subscribed: true },
+  action: 'a'  // Merges with existing values
+})
+
+// Replace all fields
+await adapterDB.saveContact({
+  from: '1234567890',
+  values: { name: 'Jane Doe' },
+  action: 'u'  // Replaces all values
+})
+```
+
+## PostgreSQL Setup
+
+### 1. Install PostgreSQL
+
+<CodeGroup>
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+```bash macOS (Homebrew)
+brew install postgresql@15
+brew services start postgresql@15
+```
+
+```bash Windows
+# Download from https://www.postgresql.org/download/windows/
+# Run the installer and follow the wizard
+```
+</CodeGroup>
+
+### 2. Create Database and User
+
+```bash
+# Switch to postgres user
+sudo -u postgres psql
+```
+
+```sql
+-- Create database
+CREATE DATABASE builderbot;
+
+-- Create user
+CREATE USER builderbot_user WITH PASSWORD 'your_password';
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE builderbot TO builderbot_user;
+
+-- Connect to database
+\c builderbot
+
+-- Grant schema privileges
+GRANT ALL ON SCHEMA public TO builderbot_user;
+
+-- Exit
+\q
+```
+
+### 3. Test Connection
+
+```bash
+psql -U builderbot_user -d builderbot -h localhost
+```
+
+## Cloud PostgreSQL Providers
+
+### Railway
+
+1. Create new PostgreSQL database in Railway
+2. Copy connection details from "Connect" tab
+3. Use provided credentials:
+
+```typescript
+const adapterDB = new PostgreSQLAdapter({
+  host: process.env.PGHOST,
+  user: process.env.PGUSER,
+  database: process.env.PGDATABASE,
+  password: process.env.PGPASSWORD,
+  port: Number(process.env.PGPORT)
+})
+```
+
+### Render
+
+1. Create new PostgreSQL database in Render
+2. Copy "Internal Connection String" for same-region access
+3. Use provided credentials
+
+### Supabase
+
+1. Create new project in Supabase
+2. Go to Settings → Database
+3. Use "Connection pooling" settings for production:
+
+```typescript
+const adapterDB = new PostgreSQLAdapter({
+  host: 'db.xxxxx.supabase.co',
+  user: 'postgres',
+  database: 'postgres',
+  password: process.env.SUPABASE_PASSWORD,
+  port: 6543  // Pooler port
+})
+```
+
+## Indexes for Performance
+
+Add indexes to improve query performance:
+
+```sql
+-- Indexes on history table
+CREATE INDEX idx_history_phone ON history(phone);
+CREATE INDEX idx_history_created ON history(created_at DESC);
+CREATE INDEX idx_history_contact ON history(contact_id);
+
+-- Indexes on contact table
+CREATE INDEX idx_contact_phone ON contact(phone);
+CREATE INDEX idx_contact_last_interaction ON contact(last_interaction DESC);
+
+-- Index on JSONB values (for searching contact data)
+CREATE INDEX idx_contact_values ON contact USING GIN (values);
+```
+
+## Advanced Queries
+
+Query JSONB contact data:
+
+```sql
+-- Find contacts with specific value
+SELECT * FROM contact WHERE values->>'name' = 'John Doe';
+
+-- Find contacts with email
+SELECT * FROM contact WHERE values ? 'email';
+
+-- Find contacts with notifications enabled
+SELECT * FROM contact WHERE values->'preferences'->>'notifications' = 'true';
+```
+
+## TypeScript Support
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const welcomeFlow = addKeyword<BaileysProvider, PostgreSQLAdapter>(['hello'])
+  .addAnswer('Hi! How can I help you?', async (ctx, { state }) => {
+    const adapterDB = state.get('adapterDB') as PostgreSQLAdapter
+    const contact = await adapterDB.getContact(ctx)
+    console.log('Contact data:', contact?.values)
+  })
+```
+
+## Backup and Restore
+
+### Using pg_dump
+
+```bash
+# Backup entire database
+pg_dump -U builderbot_user -d builderbot > backup.sql
+
+# Backup specific tables
+pg_dump -U builderbot_user -d builderbot -t history -t contact > backup.sql
+
+# Backup with compression
+pg_dump -U builderbot_user -d builderbot | gzip > backup.sql.gz
+
+# Restore
+psql -U builderbot_user -d builderbot < backup.sql
+```
+
+### Automated Backups
+
+```bash
+# Add to crontab (crontab -e)
+0 2 * * * pg_dump -U builderbot_user builderbot | gzip > /backups/builderbot_$(date +\%Y\%m\%d).sql.gz
+```
+
+## Connection Pooling
+
+The adapter uses `pg.Pool` for connection pooling:
+
+```typescript packages/database-postgres/src/postgresAdapter.ts
+import { Pool } from 'pg'
+
+async init(): Promise<boolean> {
+  const pool = new Pool(this.credentials)
+  const db = await pool.connect()
+  this.db = db
+  return true
+}
+```
+
+For custom pool configuration:
+
+```typescript
+import { Pool } from 'pg'
+
+const pool = new Pool({
+  host: process.env.POSTGRES_DB_HOST,
+  user: process.env.POSTGRES_DB_USER,
+  database: process.env.POSTGRES_DB_NAME,
+  password: process.env.POSTGRES_DB_PASSWORD,
+  port: 5432,
+  max: 20,                  // Maximum pool size
+  idleTimeoutMillis: 30000, // Close idle clients after 30s
+  connectionTimeoutMillis: 2000 // Return error after 2s if no connection available
+})
+```
+
+## Troubleshooting
+
+### Connection Refused
+
+```
+Error: connect ECONNREFUSED 127.0.0.1:5432
+```
+
+**Solutions**:
+- Check if PostgreSQL is running: `sudo systemctl status postgresql`
+- Verify port: `sudo netstat -tlnp | grep 5432`
+- Check `postgresql.conf` for `listen_addresses`
+
+### Authentication Failed
+
+```
+Error: password authentication failed for user "user"
+```
+
+**Solutions**:
+- Verify username and password
+- Check `pg_hba.conf` for authentication method
+- Ensure user has database access
+
+### Permission Denied
+
+```
+Error: permission denied for schema public
+```
+
+**Solution**:
+```sql
+GRANT ALL ON SCHEMA public TO builderbot_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO builderbot_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO builderbot_user;
+```
+
+## Best Practices
+
+<Check>Use environment variables for credentials</Check>
+<Check>Create dedicated database user with limited privileges</Check>
+<Check>Enable SSL/TLS for remote connections</Check>
+<Check>Add indexes on frequently queried columns</Check>
+<Check>Set up automated backups</Check>
+<Check>Use connection pooling for high traffic</Check>
+<Check>Monitor query performance with `EXPLAIN ANALYZE`</Check>
+<Check>Leverage JSONB for flexible contact data</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="key" href="/deployment/environment">
+    Secure your database credentials
+  </Card>
+  <Card title="Scaling" icon="chart-line" href="/deployment/scaling">
+    Scale your bot with PostgreSQL
+  </Card>
+</CardGroup>

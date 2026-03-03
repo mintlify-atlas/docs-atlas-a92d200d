@@ -1,0 +1,228 @@
+---
+title: endFlow
+description: Terminate the current conversation flow and clear the message queue
+---
+
+The `endFlow` method immediately terminates the current conversation flow, clears the message queue, and optionally sends a final message to the user.
+
+## Signature
+
+```typescript
+endFlow(message?: string): void
+```
+
+## Parameters
+
+<ParamField path="message" type="string" optional>
+  An optional message to send to the user before ending the flow.
+</ParamField>
+
+## Return Value
+
+Returns `void` - this method does not return a promise.
+
+## How It Works
+
+1. **Sets end flag** - Marks the flow as ended in the internal state
+2. **Sends optional message** - If a message is provided, sends it to the user
+3. **Clears queue** - Removes all pending messages from the conversation queue
+4. **Stops flow execution** - Prevents any subsequent flow steps from executing
+5. **Resets state** - Sets `__end_flow__` flag in the conversation state
+
+## Usage Examples
+
+### Basic Flow Termination
+
+End a flow after completing a task:
+
+```typescript
+const orderFlow = addKeyword('order')
+  .addAnswer('What would you like to order?', { capture: true })
+  .addAction(async (ctx, { endFlow }) => {
+    // Process order
+    await processOrder(ctx.body)
+    return endFlow('Thank you! Your order has been placed.')
+  })
+```
+
+### Conditional Flow Ending
+
+End flow based on user input:
+
+```typescript
+const surveyFlow = addKeyword('survey')
+  .addAnswer(
+    'Would you like to participate in our survey?',
+    { capture: true },
+    async (ctx, { endFlow, flowDynamic }) => {
+      if (ctx.body.toLowerCase() === 'no') {
+        return endFlow('No problem! Have a great day.')
+      }
+      await flowDynamic('Great! Let\'s begin...')
+    }
+  )
+```
+
+### Silent Flow Ending
+
+End flow without sending a message:
+
+```typescript
+const quickFlow = addKeyword('quick')
+  .addAnswer('Processing your request...')
+  .addAction(async (ctx, { endFlow }) => {
+    await performAction()
+    return endFlow() // No message sent
+  })
+```
+
+### Error Handling with endFlow
+
+Gracefully end flow on errors:
+
+```typescript
+const paymentFlow = addKeyword('payment')
+  .addAnswer(
+    'Enter your card number',
+    { capture: true },
+    async (ctx, { endFlow }) => {
+      try {
+        await processPayment(ctx.body)
+      } catch (error) {
+        return endFlow('Payment failed. Please try again later.')
+      }
+    }
+  )
+```
+
+### Using with State
+
+End flow after saving user data:
+
+```typescript
+const registrationFlow = addKeyword('register')
+  .addAnswer('Enter your name', { capture: true }, async (ctx, { state }) => {
+    await state.update({ name: ctx.body })
+  })
+  .addAnswer(
+    'Enter your email',
+    { capture: true },
+    async (ctx, { state, endFlow }) => {
+      await state.update({ email: ctx.body })
+      const userData = state.getMyState()
+      
+      // Save to database
+      await saveUser(userData)
+      
+      return endFlow(`Registration complete! Welcome ${userData.name}.`)
+    }
+  )
+```
+
+## Important Notes
+
+<Warning>
+  **Queue Clearing**: `endFlow` clears the entire message queue. Any messages that were queued but not yet sent will be discarded.
+</Warning>
+
+<Note>
+  - `endFlow` does **not** clear the user's state - use `state.clear()` if needed
+  - After calling `endFlow`, no subsequent steps in the flow will execute
+  - The method is synchronous but may trigger async operations internally
+  - To continue a new flow after ending, the user must send a new trigger message
+</Note>
+
+## Common Patterns
+
+### Timeout/Idle Flow Ending
+
+```typescript
+const interactiveFlow = addKeyword('start')
+  .addAnswer(
+    'Please respond within 30 seconds',
+    { capture: true, idle: 30000 },
+    async (ctx, { endFlow }) => {
+      if (ctx.idleFallBack) {
+        return endFlow('Session expired due to inactivity.')
+      }
+      // Continue processing
+    }
+  )
+```
+
+### Maximum Attempts Pattern
+
+```typescript
+const verificationFlow = addKeyword('verify')
+  .addAnswer(
+    'Enter verification code',
+    { capture: true },
+    async (ctx, { state, endFlow, fallBack }) => {
+      const attempts = state.get('attempts') || 0
+      
+      if (attempts >= 3) {
+        return endFlow('Maximum attempts reached. Please try again later.')
+      }
+      
+      const isValid = await verifyCode(ctx.body)
+      
+      if (!isValid) {
+        await state.update({ attempts: attempts + 1 })
+        return fallBack('Invalid code. Please try again.')
+      }
+      
+      return endFlow('Verification successful!')
+    }
+  )
+```
+
+### Cleanup Before Ending
+
+```typescript
+const sessionFlow = addKeyword('session')
+  .addAction(
+    async (ctx, { state, endFlow }) => {
+      // Perform cleanup
+      const sessionData = state.getMyState()
+      await logSession(sessionData)
+      
+      // Clear state
+      state.clear()
+      
+      return endFlow('Session ended. All data cleared.')
+    }
+  )
+```
+
+### Early Exit Pattern
+
+```typescript
+const premiumFlow = addKeyword('premium')
+  .addAction(
+    async (ctx, { state, endFlow }) => {
+      const user = await getUser(ctx.from)
+      
+      if (!user.isPremium) {
+        return endFlow('This feature is only available for premium users.')
+      }
+      
+      // Continue with premium features
+    }
+  )
+  .addAnswer('Welcome to premium features!')
+```
+
+## Difference from gotoFlow
+
+| Feature | `endFlow` | `gotoFlow` |
+|---------|-----------|------------|
+| **Purpose** | Terminate conversation | Navigate to new flow |
+| **Queue** | Clears queue | Clears queue |
+| **Next action** | Waits for new trigger | Starts new flow immediately |
+| **Use case** | Completion/exit | Flow navigation |
+
+## Related Methods
+
+- [`gotoFlow`](/api/flow/goto-flow) - Navigate to a different flow
+- [`fallBack`](/api/flow/fall-back) - Repeat the previous message
+- [`flowDynamic`](/api/flow/flow-dynamic) - Send dynamic messages

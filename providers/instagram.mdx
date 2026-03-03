@@ -1,0 +1,152 @@
+---
+title: Instagram Provider
+description: Instagram Direct Messages integration
+---
+
+The Instagram provider enables building chatbots for Instagram Direct Messages, allowing automated conversations with your Instagram followers.
+
+## Features
+
+- Direct message support
+- Text messaging
+- Media sharing
+- Story replies
+- Quick replies
+- Webhook integration
+- Business account integration
+
+## Prerequisites
+
+<Steps>
+  <Step title="Instagram Business Account">
+    Convert your Instagram account to a Business account
+  </Step>
+  
+  <Step title="Link Facebook Page">
+    Link your Instagram Business account to a Facebook Page
+  </Step>
+  
+  <Step title="Create Facebook App">
+    Set up a Facebook App in Meta Developer Portal
+  </Step>
+  
+  <Step title="Get Credentials">
+    Obtain:
+    - Page Access Token
+    - Instagram Account ID
+    - Verify Token
+  </Step>
+</Steps>
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-instagram
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { InstagramProvider } from '@builderbot/provider-instagram'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(InstagramProvider, {
+  pageAccessToken: 'YOUR_PAGE_ACCESS_TOKEN',
+  instagramAccountId: 'YOUR_INSTAGRAM_ACCOUNT_ID',
+  verifyToken: 'YOUR_VERIFY_TOKEN',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Environment Variables
+
+```env
+IG_PAGE_ACCESS_TOKEN=your_page_access_token
+IG_ACCOUNT_ID=your_instagram_account_id
+IG_VERIFY_TOKEN=your_verify_token
+PORT=3000
+```
+
+## Basic Usage
+
+### Sending Text Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Thanks for messaging us on Instagram')
+  .addAnswer('How can we help?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('product')
+  .addAnswer('Check out our latest product:', {
+    media: 'https://example.com/product.jpg'
+  })
+```
+
+## Story Replies
+
+Handle replies to your Instagram Stories:
+
+```typescript
+const storyReplyFlow = addKeyword('STORY_REPLY')
+  .addAction(async (ctx, { flowDynamic }) => {
+    await flowDynamic('Thanks for replying to our story!')
+  })
+```
+
+## Webhook Configuration
+
+### Webhook Endpoints
+
+```
+GET  /webhook - Webhook verification
+POST /webhook - Receive messages
+```
+
+### Meta Developer Setup
+
+1. Go to your Facebook App Dashboard
+2. Add Instagram product
+3. Configure webhook URL: `https://your-domain.com/webhook`
+4. Enter verify token
+5. Subscribe to messaging events
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Account Requirements">
+    - Use Instagram Business account
+    - Link to Facebook Page
+    - Verify business details
+    - Follow Instagram policies
+  </Accordion>
+
+  <Accordion title="Message Limits">
+    - Respect 24-hour messaging window
+    - Use quick replies for engagement
+    - Avoid spam behavior
+    - Monitor message quality scores
+  </Accordion>
+</AccordionGroup>
+
+## Further Resources
+
+- [Instagram Messaging API](https://developers.facebook.com/docs/messenger-platform/instagram)
+- [Meta for Developers](https://developers.facebook.com)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

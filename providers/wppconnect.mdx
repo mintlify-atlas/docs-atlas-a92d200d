@@ -1,0 +1,424 @@
+---
+title: WPPConnect Provider
+description: WhatsApp integration via WPPConnect library
+---
+
+The WPPConnect provider enables WhatsApp integration using the browser-based WPPConnect library, offering an easy setup process with QR code authentication.
+
+## Features
+
+- QR code authentication
+- Text messaging
+- Media support (images, videos, audio, documents)
+- Polls
+- Voice notes (PTT)
+- Stickers
+- Location sharing
+- Contact cards
+- Session persistence
+- Group support
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-wppconnect
+```
+
+## Dependencies
+
+The provider uses:
+- `@wppconnect-team/wppconnect`: Browser automation for WhatsApp Web
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { WPPConnectProvider } from '@builderbot/provider-wppconnect'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(WPPConnectProvider, {
+  name: 'my-bot'
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Configuration Options
+
+```typescript
+const provider = createProvider(WPPConnectProvider, {
+  name: 'my-bot',  // Session name
+  port: 3000       // HTTP server port
+})
+```
+
+## Authentication
+
+### QR Code
+
+On first run, scan the QR code:
+
+1. Run your bot
+2. A QR code will be displayed in the terminal
+3. Access `http://localhost:3000/` to see the QR code image
+4. Scan with WhatsApp (Linked Devices)
+5. Wait for connection confirmation
+
+### Session Persistence
+
+Sessions are automatically saved in `{name}_sessions/` directory.
+
+## Basic Usage
+
+### Sending Text Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to our bot')
+  .addAnswer('How can I help you?')
+```
+
+### Sending Media
+
+```typescript
+import { join } from 'path'
+
+const mediaFlow = addKeyword('media')
+  // Send image
+  .addAnswer('Here is an image:', {
+    media: join(process.cwd(), 'assets', 'image.png')
+  })
+  // Send video
+  .addAnswer('Check this video:', {
+    media: './assets/video.mp4'
+  })
+  // Send audio
+  .addAnswer('Listen to this:', {
+    media: './assets/audio.mp3'
+  })
+  // Send document
+  .addAnswer('Here is a PDF:', {
+    media: './assets/document.pdf'
+  })
+```
+
+## Advanced Features
+
+### Sending Images
+
+```typescript
+const imageFlow = addKeyword('image')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendImage(
+      ctx.from,
+      './path/to/image.jpg',
+      'Check out this image!'
+    )
+  })
+```
+
+### Sending Videos
+
+```typescript
+const videoFlow = addKeyword('video')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendVideo(
+      ctx.from,
+      './path/to/video.mp4',
+      'Watch this video'
+    )
+  })
+```
+
+<Note>
+  Videos are sent as GIFs by default using `sendVideoAsGif` method.
+</Note>
+
+### Sending Voice Notes
+
+```typescript
+const voiceFlow = addKeyword('voice')
+  .addAction(async (ctx, { provider }) => {
+    // Send audio file as voice note (PTT)
+    await provider.sendPtt(
+      ctx.from,
+      './path/to/audio.ogg'
+    )
+  })
+```
+
+### Sending Documents
+
+```typescript
+const documentFlow = addKeyword('document')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendFile(
+      ctx.from,
+      './path/to/document.pdf',
+      'Here is the requested document'
+    )
+  })
+```
+
+### Sending Polls
+
+```typescript
+const pollFlow = addKeyword('poll')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendPoll(
+      ctx.from,
+      'Do you like WPPConnect?',
+      {
+        options: ['Yes', 'No', 'Maybe'],
+        multiselect: false  // true for multiple selection
+      }
+    )
+  })
+```
+
+### Receiving Poll Responses
+
+The provider automatically handles poll responses:
+
+```typescript
+const pollResponseFlow = addKeyword('POLL_RESPONSE')
+  .addAction(async (ctx, { flowDynamic }) => {
+    await flowDynamic(`You selected: ${ctx.body}`)
+  })
+```
+
+### Saving Received Files
+
+```typescript
+import { join } from 'path'
+
+const receiveMediaFlow = addKeyword('MEDIA')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    const filePath = await provider.saveFile(ctx, {
+      path: join(process.cwd(), 'downloads')
+    })
+    
+    await flowDynamic(`File saved: ${filePath}`)
+  })
+```
+
+## Media Type Detection
+
+The provider automatically detects media types:
+
+```typescript
+const autoMediaFlow = addKeyword('send')
+  .addAnswer('Sending file...', {
+    media: './file.jpg'  // Auto-detects as image
+  })
+```
+
+Supported types:
+- **Images**: Sent via `sendImage`
+- **Videos**: Sent via `sendVideoAsGif`
+- **Audio**: Converted to OPUS and sent via `sendPtt`
+- **Documents**: Sent via `sendFile`
+
+## Event Handling
+
+### Message Events
+
+The provider listens to:
+- `onMessage`: Regular messages
+- `onPollResponse`: Poll answer selections
+
+### Ready Event
+
+```typescript
+provider.on('ready', () => {
+  console.log('WPPConnect is ready!')
+})
+```
+
+### Host Information
+
+```typescript
+provider.on('host', (host) => {
+  console.log('Connected as:', host.phone)
+})
+```
+
+### QR Code Event
+
+```typescript
+provider.on('require_action', ({ title, instructions, payload }) => {
+  console.log(title)
+  console.log(instructions.join('\n'))
+  // QR code available at http://localhost:3000
+})
+```
+
+## Session Management
+
+### Session Files
+
+Sessions are stored in:
+```
+{name}_sessions/
+```
+
+### Clear Session
+
+To reset authentication:
+
+```bash
+rm -rf {name}_sessions
+```
+
+Then restart your bot and scan QR code again.
+
+## HTTP Endpoints
+
+### QR Code Endpoint
+
+```
+GET http://localhost:3000/
+```
+
+Displays the QR code image for scanning.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Session Management">
+    - Backup session files regularly
+    - Don't share session files (contain auth data)
+    - Monitor for session expiration
+    - Implement reconnection logic
+  </Accordion>
+
+  <Accordion title="Media Handling">
+    - Convert audio to OPUS format for voice notes
+    - Validate file sizes before sending
+    - Use appropriate file formats
+    - Clean up temporary files
+  </Accordion>
+
+  <Accordion title="Message Handling">
+    - Handle different message types separately
+    - Validate phone numbers
+    - Implement error handling for failed sends
+    - Use polls for structured choices
+  </Accordion>
+
+  <Accordion title="Performance">
+    - Avoid sending too many messages quickly
+    - Use delays between bulk messages
+    - Monitor browser memory usage
+    - Restart periodically for long-running bots
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="QR Code Not Displaying">
+    - Check if port 3000 is available
+    - Verify browser automation is working
+    - Review console logs for errors
+    - Try accessing `http://localhost:3000/`
+  </Accordion>
+
+  <Accordion title="Session Expired">
+    - Delete the `{name}_sessions` directory
+    - Restart the bot
+    - Scan QR code again
+    - Check WhatsApp hasn't logged out the session
+  </Accordion>
+
+  <Accordion title="Messages Not Sending">
+    - Verify session is active
+    - Check phone number format
+    - Review browser console in headless mode
+    - Ensure WhatsApp Web is accessible
+  </Accordion>
+
+  <Accordion title="Browser Crashes">
+    - Increase system memory
+    - Disable unnecessary browser features
+    - Update Chromium/Chrome
+    - Check for resource leaks
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Bot
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { WPPConnectProvider } from '@builderbot/provider-wppconnect'
+import { MemoryDB } from '@builderbot/bot'
+import { join } from 'path'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('👋 Hello! Welcome to our WhatsApp bot')
+  .addAnswer('How can we help you?')
+
+const pollFlow = addKeyword('poll')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendPoll(
+      ctx.from,
+      'How satisfied are you with our service?',
+      {
+        options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Unsatisfied'],
+        multiselect: false
+      }
+    )
+  })
+
+const mediaFlow = addKeyword('files')
+  .addAnswer('I\'ll send you some files...')
+  .addAnswer('Image:', { media: join(process.cwd(), 'assets', 'image.png') })
+  .addAnswer('Document:', { media: join(process.cwd(), 'assets', 'doc.pdf') })
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow, pollFlow, mediaFlow])
+  
+  const adapterProvider = createProvider(WPPConnectProvider, {
+    name: 'my-wppconnect-bot'
+  })
+  
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(3000)
+}
+
+main()
+```
+
+## Comparison with Other Providers
+
+| Feature | WPPConnect | Baileys | Meta |
+|---------|-----------|---------|------|
+| Setup Difficulty | Easy | Easy | Complex |
+| Cost | Free | Free | Paid |
+| Reliability | Good | Good | Excellent |
+| Polls | ✅ | ✅ | ❌ |
+| Buttons | ⚠️ Deprecated | ⚠️ Deprecated | ✅ |
+| Scale | Small-Medium | Small-Large | Enterprise |
+
+## Further Resources
+
+- [WPPConnect GitHub](https://github.com/wppconnect-team/wppconnect)
+- [WPPConnect Documentation](https://wppconnect.io)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

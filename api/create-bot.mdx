@@ -1,0 +1,219 @@
+---
+title: 'createBot'
+description: 'Create a BuilderBot instance with provider, database, and flow configuration'
+---
+
+## Overview
+
+The `createBot` function creates and initializes a bot instance with the specified provider, database, and conversation flows.
+
+## Function Signature
+
+<CodeGroup>
+```typescript TypeScript
+const createBot = async <P extends ProviderClass = any, D extends MemoryDB = any>(
+  { flow, database, provider }: { 
+    flow: FlowClass; 
+    database: D; 
+    provider: P 
+  },
+  args?: Omit<GeneralArgs, 'listEvents'>
+): Promise<CoreClass<P, D>>
+```
+
+```javascript JavaScript
+const createBot = async (
+  { flow, database, provider },
+  args
+)
+```
+</CodeGroup>
+
+## Parameters
+
+<ParamField path="flow" type="FlowClass" required>
+  The conversation flow instance created with `createFlow()`. Contains all the conversation logic and flows for your bot.
+</ParamField>
+
+<ParamField path="database" type="MemoryDB" required>
+  The database adapter instance for storing conversation state and user data.
+</ParamField>
+
+<ParamField path="provider" type="ProviderClass" required>
+  The messaging platform provider instance created with `createProvider()`.
+</ParamField>
+
+<ParamField path="args" type="object">
+  Optional configuration arguments for the bot instance.
+  
+  <Expandable title="properties">
+    <ParamField path="blackList" type="string[]" default="[]">
+      Array of phone numbers to block from interacting with the bot.
+    </ParamField>
+    
+    <ParamField path="delay" type="number" default="0">
+      Global delay in milliseconds between bot responses.
+    </ParamField>
+    
+    <ParamField path="globalState" type="Record<string, any>" default="{}">
+      Initial global state object accessible across all flows.
+    </ParamField>
+    
+    <ParamField path="extensions" type="Record<string, any>" default="[]">
+      Custom extensions to add functionality to the bot.
+    </ParamField>
+    
+    <ParamField path="queue" type="object">
+      Queue configuration for message processing.
+      
+      <Expandable title="properties">
+        <ParamField path="timeout" type="number" default="50000">
+          Maximum time in milliseconds for processing a message.
+        </ParamField>
+        
+        <ParamField path="concurrencyLimit" type="number" default="15">
+          Maximum number of concurrent message handlers.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="bot" type="Promise<CoreClass<P, D>>">
+  Returns a Promise that resolves to the initialized bot instance with full functionality.
+</ResponseField>
+
+## Usage Examples
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createBot, createFlow, createProvider, MemoryDB } from '@builderbot/bot'
+    import { BaileysProvider } from '@builderbot/provider-baileys'
+
+    const main = async () => {
+      const adapterDB = new MemoryDB()
+      const adapterFlow = createFlow([])
+      const adapterProvider = createProvider(BaileysProvider)
+
+      const bot = await createBot({
+        flow: adapterFlow,
+        database: adapterDB,
+        provider: adapterProvider
+      })
+
+      // Bot is now ready
+    }
+
+    main()
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createBot, createFlow, createProvider, MemoryDB } = require('@builderbot/bot')
+    const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+    const main = async () => {
+      const adapterDB = new MemoryDB()
+      const adapterFlow = createFlow([])
+      const adapterProvider = createProvider(BaileysProvider)
+
+      const bot = await createBot({
+        flow: adapterFlow,
+        database: adapterDB,
+        provider: adapterProvider
+      })
+
+      // Bot is now ready
+    }
+
+    main()
+    ```
+  </Tab>
+</Tabs>
+
+### With Custom Configuration
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createBot, createFlow, createProvider, MemoryDB } from '@builderbot/bot'
+    import { BaileysProvider } from '@builderbot/provider-baileys'
+
+    const main = async () => {
+      const adapterDB = new MemoryDB()
+      const adapterFlow = createFlow([])
+      const adapterProvider = createProvider(BaileysProvider)
+
+      const bot = await createBot(
+        {
+          flow: adapterFlow,
+          database: adapterDB,
+          provider: adapterProvider
+        },
+        {
+          blackList: ['+1234567890'],
+          delay: 1000,
+          globalState: {
+            apiKey: process.env.API_KEY,
+            adminNumbers: ['+1987654321']
+          },
+          queue: {
+            timeout: 60000,
+            concurrencyLimit: 20
+          }
+        }
+      )
+
+      // Bot is now ready with custom configuration
+    }
+
+    main()
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createBot, createFlow, createProvider, MemoryDB } = require('@builderbot/bot')
+    const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+    const main = async () => {
+      const adapterDB = new MemoryDB()
+      const adapterFlow = createFlow([])
+      const adapterProvider = createProvider(BaileysProvider)
+
+      const bot = await createBot(
+        {
+          flow: adapterFlow,
+          database: adapterDB,
+          provider: adapterProvider
+        },
+        {
+          blackList: ['+1234567890'],
+          delay: 1000,
+          globalState: {
+            apiKey: process.env.API_KEY,
+            adminNumbers: ['+1987654321']
+          },
+          queue: {
+            timeout: 60000,
+            concurrencyLimit: 20
+          }
+        }
+      )
+
+      // Bot is now ready with custom configuration
+    }
+
+    main()
+    ```
+  </Tab>
+</Tabs>
+
+## Related
+
+- [createFlow](/api/create-flow) - Create conversation flows
+- [createProvider](/api/create-provider) - Initialize a messaging provider

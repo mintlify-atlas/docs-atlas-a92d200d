@@ -1,0 +1,529 @@
+---
+title: Meta Provider
+description: Official Meta WhatsApp Business API integration
+---
+
+The Meta provider integrates with the official WhatsApp Business API from Meta (Facebook). This is the enterprise-grade solution for WhatsApp messaging at scale.
+
+## Features
+
+- Official Meta WhatsApp Business API
+- Text messaging with formatting
+- Interactive buttons (up to 3)
+- Interactive lists
+- Template messages
+- Media messages (image, video, audio, document)
+- Location messages
+- Contact cards
+- WhatsApp Flows
+- Product catalog messages
+- Reactions
+- Read receipts
+- Typing indicators
+- Message queuing for rate limiting
+
+## Prerequisites
+
+<Steps>
+  <Step title="Meta Business Account">
+    Create a Meta Business Account at [business.facebook.com](https://business.facebook.com)
+  </Step>
+  
+  <Step title="WhatsApp Business App">
+    Set up a WhatsApp Business App in the Meta Developer Portal
+  </Step>
+  
+  <Step title="Get Credentials">
+    Obtain your:
+    - Phone Number ID (`numberId`)
+    - Access Token (`jwtToken`)
+    - Verify Token (`verifyToken`)
+  </Step>
+  
+  <Step title="Configure Webhook">
+    Set up webhook URL to receive messages
+  </Step>
+</Steps>
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-meta
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { MetaProvider } from '@builderbot/provider-meta'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(MetaProvider, {
+  jwtToken: 'YOUR_ACCESS_TOKEN',
+  numberId: 'YOUR_PHONE_NUMBER_ID',
+  verifyToken: 'YOUR_VERIFY_TOKEN',
+  version: 'v18.0',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Environment Variables
+
+```env
+META_ACCESS_TOKEN=your_jwt_token
+META_PHONE_NUMBER_ID=your_number_id
+META_VERIFY_TOKEN=your_verify_token
+META_VERSION=v18.0
+PORT=3000
+```
+
+```typescript
+const provider = createProvider(MetaProvider, {
+  jwtToken: process.env.META_ACCESS_TOKEN,
+  numberId: process.env.META_PHONE_NUMBER_ID,
+  verifyToken: process.env.META_VERIFY_TOKEN,
+  version: process.env.META_VERSION || 'v18.0'
+})
+```
+
+## Basic Usage
+
+### Sending Text Messages
+
+```typescript
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to our business')
+  .addAnswer('How can we help you today?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('media')
+  // Send image from local file
+  .addAnswer('Here is our product:', {
+    media: './assets/product.jpg'
+  })
+  // Send image from URL
+  .addAnswer('Check this out:', {
+    media: 'https://example.com/image.jpg'
+  })
+```
+
+## Interactive Messages
+
+### Buttons
+
+```typescript
+const buttonFlow = addKeyword('options')
+  .addAnswer(
+    'Choose an option:',
+    {
+      buttons: [
+        { body: 'Option 1' },
+        { body: 'Option 2' },
+        { body: 'Option 3' }
+      ]
+    },
+    async (ctx, { flowDynamic }) => {
+      await flowDynamic(`You selected: ${ctx.body}`)
+    }
+  )
+```
+
+<Note>
+  WhatsApp limits:
+  - Maximum 3 buttons per message
+  - Button text: max 20 characters
+</Note>
+
+### Lists
+
+```typescript
+const listFlow = addKeyword('menu')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendList(ctx.from, {
+      header: {
+        type: 'text',
+        text: 'Our Menu'
+      },
+      body: {
+        text: 'Select a category'
+      },
+      footer: {
+        text: 'Powered by BuilderBot'
+      },
+      action: {
+        button: 'View Menu',
+        sections: [
+          {
+            title: 'Main Dishes',
+            rows: [
+              {
+                id: 'pasta',
+                title: 'Pasta',
+                description: 'Delicious Italian pasta'
+              },
+              {
+                id: 'pizza',
+                title: 'Pizza',
+                description: 'Wood-fired pizza'
+              }
+            ]
+          },
+          {
+            title: 'Desserts',
+            rows: [
+              {
+                id: 'tiramisu',
+                title: 'Tiramisu',
+                description: 'Classic Italian dessert'
+              }
+            ]
+          }
+        ]
+      }
+    })
+  })
+```
+
+### URL Buttons
+
+```typescript
+const urlButtonFlow = addKeyword('website')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendButtonUrl(
+      ctx.from,
+      {
+        body: 'Visit Website',
+        url: 'https://example.com'
+      },
+      'Click the button below to visit our website'
+    )
+  })
+```
+
+## Template Messages
+
+Template messages must be pre-approved by Meta.
+
+```typescript
+const templateFlow = addKeyword('template')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendTemplate(
+      ctx.from,
+      'hello_world',  // Template name
+      'en_US',        // Language code
+      [
+        {
+          type: 'body',
+          parameters: [
+            {
+              type: 'text',
+              text: 'John'
+            }
+          ]
+        }
+      ]
+    )
+  })
+```
+
+## Advanced Features
+
+### Sending Location
+
+```typescript
+const locationFlow = addKeyword('location')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendLocation(ctx.from, {
+      lat_number: '40.7128',
+      long_number: '-74.0060',
+      name: 'New York City',
+      address: 'Manhattan, NY'
+    })
+  })
+```
+
+### Requesting Location
+
+```typescript
+const requestLocationFlow = addKeyword('share location')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendLocationRequest(
+      ctx.from,
+      'Please share your location for delivery'
+    )
+  })
+```
+
+### Sending Contacts
+
+```typescript
+const contactFlow = addKeyword('contact')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendContacts(ctx.from, [
+      {
+        name: {
+          formatted_name: 'John Doe',
+          first_name: 'John',
+          last_name: 'Doe'
+        },
+        phones: [
+          {
+            phone: '+1234567890',
+            type: 'MOBILE'
+          }
+        ],
+        emails: [
+          {
+            email: 'john@example.com',
+            type: 'WORK'
+          }
+        ]
+      }
+    ])
+  })
+```
+
+### Reactions
+
+```typescript
+const reactionFlow = addKeyword('react')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendReaction(ctx.from, {
+      message_id: ctx.key.id,
+      emoji: '👍'
+    })
+  })
+```
+
+### Typing Indicator
+
+```typescript
+const typingFlow = addKeyword('typing')
+  .addAction(async (ctx, { provider }) => {
+    // Show typing
+    await provider.sendPresenceUpdate(ctx.from, 'typing_on')
+    
+    // Simulate processing
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    // Hide typing
+    await provider.sendPresenceUpdate(ctx.from, 'typing_off')
+    
+    // Send message
+    await provider.sendText(ctx.from, 'Here is your response!')
+  })
+```
+
+### Mark as Read
+
+```typescript
+const readFlow = addKeyword('WELCOME')
+  .addAction(async (ctx, { provider }) => {
+    // Mark message as read
+    await provider.markAsRead(ctx.key.id)
+  })
+```
+
+## WhatsApp Flows
+
+WhatsApp Flows enable rich, multi-step experiences.
+
+```typescript
+const flowMessageFlow = addKeyword('survey')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendFlow(
+      ctx.from,
+      'Customer Survey',           // Header
+      'Help us improve our service', // Body
+      'Thank you!',                // Footer
+      '3',                         // Flow version
+      'navigate',                  // Flow action
+      'FLOW_ID_FROM_META',         // Flow ID
+      'FLOW_TOKEN',                // Flow token
+      'Start Survey',              // Button text
+      false,                       // Is draft
+      'WELCOME_SCREEN',            // Initial screen
+      { customer_id: '12345' }     // Data payload
+    )
+  })
+```
+
+## Product Catalog
+
+```typescript
+const catalogFlow = addKeyword('products')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendCatalog(
+      ctx.from,
+      'Browse our products',
+      'PRODUCT_RETAILER_ID'
+    )
+  })
+```
+
+## Webhook Configuration
+
+### Webhook Endpoints
+
+The provider automatically sets up webhook endpoints:
+
+```
+GET  /webhook  - Webhook verification
+POST /webhook  - Receive messages
+```
+
+### Meta Webhook Setup
+
+1. Go to your WhatsApp Business App settings
+2. Set webhook URL: `https://your-domain.com/webhook`
+3. Set verify token (matches your `verifyToken` config)
+4. Subscribe to message events
+
+## Saving Files
+
+```typescript
+const saveFileFlow = addKeyword('MEDIA')
+  .addAction(async (ctx, { provider }) => {
+    const filePath = await provider.saveFile(ctx, {
+      path: './downloads'
+    })
+    console.log('File saved:', filePath)
+  })
+```
+
+## Rate Limiting
+
+The Meta provider includes built-in message queueing:
+
+```typescript
+// Messages are automatically queued
+// Default: 1 concurrent message, 100ms interval
+```
+
+## Error Handling
+
+```typescript
+provider.on('notice', ({ title, instructions }) => {
+  console.log(title)
+  console.log(instructions)
+})
+
+provider.on('error', (error) => {
+  console.error('Provider error:', error)
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Template Messages">
+    - Get templates pre-approved by Meta
+    - Use templates for proactive messaging
+    - Regular messages only work within 24-hour window after user message
+  </Accordion>
+
+  <Accordion title="Phone Number Formatting">
+    - The provider auto-formats numbers
+    - Argentina (549) and Mexico (521) prefixes are automatically corrected
+    - Always include country code
+  </Accordion>
+
+  <Accordion title="Rate Limits">
+    - Meta enforces rate limits based on your tier
+    - Start with lower tier and request increases
+    - Monitor message delivery status
+  </Accordion>
+
+  <Accordion title="Media Files">
+    - Host media on HTTPS URLs
+    - Or upload directly via the API
+    - Supported formats: JPEG, PNG, MP4, PDF, MP3, etc.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Invalid Token Error">
+    - Verify `META_ACCESS_TOKEN` is correct
+    - Check token hasn't expired
+    - Ensure token has proper permissions
+  </Accordion>
+
+  <Accordion title="Webhook Not Receiving Messages">
+    - Verify webhook URL is publicly accessible (HTTPS required)
+    - Check verify token matches
+    - Review Meta webhook logs in Developer Console
+  </Accordion>
+
+  <Accordion title="Template Rejected">
+    - Follow Meta's template guidelines
+    - Avoid promotional content in utility templates
+    - Wait for approval before using
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Bot
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { MetaProvider } from '@builderbot/provider-meta'
+import { MemoryDB } from '@builderbot/bot'
+
+const menuFlow = addKeyword(['menu', 'options'])
+  .addAnswer(
+    'Welcome! Choose an option:',
+    {
+      buttons: [
+        { body: 'Products' },
+        { body: 'Support' },
+        { body: 'About Us' }
+      ]
+    },
+    async (ctx, { flowDynamic }) => {
+      await flowDynamic(`You selected: ${ctx.body}`)
+    }
+  )
+
+const main = async () => {
+  const adapterFlow = createFlow([menuFlow])
+  
+  const adapterProvider = createProvider(MetaProvider, {
+    jwtToken: process.env.META_ACCESS_TOKEN,
+    numberId: process.env.META_PHONE_NUMBER_ID,
+    verifyToken: process.env.META_VERIFY_TOKEN,
+    version: 'v18.0'
+  })
+  
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(3000)
+}
+
+main()
+```
+
+## Further Resources
+
+- [Meta WhatsApp Business API Docs](https://developers.facebook.com/docs/whatsapp)
+- [WhatsApp Business Platform](https://business.whatsapp.com)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

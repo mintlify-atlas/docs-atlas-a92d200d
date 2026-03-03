@@ -1,0 +1,214 @@
+---
+title: Idle State
+description: Handle user inactivity timeouts in conversations
+---
+
+The Idle State API allows you to detect when users haven't responded within a certain time period and trigger callback actions.
+
+<Warning>
+  The `idle` property is deprecated. Use timeout handling in your flow logic instead.
+</Warning>
+
+## Overview
+
+Idle state monitoring helps you:
+- Send reminder messages when users are inactive
+- Reset conversation state after timeout
+- Handle abandoned flows gracefully
+- Implement session timeouts
+
+## Methods
+
+<ResponseField name="setIdleTime" type="function">
+  Sets an idle timer for a specific user conversation.
+  
+  **Parameters:**
+  - `from` (string): User identifier (phone number)
+  - `inRef` (string): Reference identifier for the idle timer
+  - `timeInSeconds` (number): Idle timeout duration in seconds
+  - `cb` (function): Callback function to execute on timeout
+  
+  **Returns:** `void`
+  
+  The callback receives:
+  - `next` (boolean): `true` if timeout occurred, `false` if stopped
+  - `inRef` (any): The reference identifier passed to setIdleTime
+  
+  ```javascript
+  idleState.setIdleTime({
+    from: ctx.from,
+    inRef: 'welcome-flow',
+    timeInSeconds: 300, // 5 minutes
+    cb: ({ next, inRef }) => {
+      if (next) {
+        console.log('User was idle for 5 minutes')
+      }
+    }
+  })
+  ```
+</ResponseField>
+
+<ResponseField name="get" type="function">
+  Checks if an idle timer exists for a user with a different reference.
+  
+  **Parameters:**
+  - `from` (string): User identifier
+  - `inRef` (string): Reference to check against
+  
+  **Returns:** `boolean | null`
+  
+  ```javascript
+  const hasOtherTimer = idleState.get({
+    from: ctx.from,
+    inRef: 'current-ref'
+  })
+  ```
+</ResponseField>
+
+<ResponseField name="stop" type="function">
+  Stops all idle timers for a specific user.
+  
+  **Parameters:**
+  - Context object with `from` property
+  
+  **Returns:** `void`
+  
+  ```javascript
+  idleState.stop({ from: ctx.from })
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Timeout Handler
+
+```javascript
+const { IdleState } = require('@builderbot/bot')
+const idleState = new IdleState()
+
+const orderFlow = addKeyword('order')
+  .addAnswer(
+    'What would you like to order?',
+    { capture: true },
+    async (ctx, { flowDynamic }) => {
+      // Set 2-minute timeout
+      idleState.setIdleTime({
+        from: ctx.from,
+        inRef: 'order-flow',
+        timeInSeconds: 120,
+        cb: async ({ next }) => {
+          if (next) {
+            await flowDynamic('Are you still there? Your order is pending.')
+          }
+        }
+      })
+    }
+  )
+```
+
+### Session Timeout
+
+```javascript
+const sessionFlow = addKeyword('start')
+  .addAnswer(
+    'Session started',
+    null,
+    async (ctx, { state, endFlow }) => {
+      idleState.setIdleTime({
+        from: ctx.from,
+        inRef: 'session',
+        timeInSeconds: 600, // 10 minutes
+        cb: async ({ next }) => {
+          if (next) {
+            state.clear()
+            await endFlow('Session expired due to inactivity')
+          }
+        }
+      })
+    }
+  )
+```
+
+### Stop Timer on Activity
+
+```javascript
+const activeFlow = addKeyword('continue')
+  .addAnswer(
+    'Great! Continuing...',
+    null,
+    async (ctx) => {
+      // Stop idle timer when user is active
+      idleState.stop({ from: ctx.from })
+      
+      // Set new timer
+      idleState.setIdleTime({
+        from: ctx.from,
+        inRef: 'active-session',
+        timeInSeconds: 300,
+        cb: ({ next }) => {
+          if (next) {
+            console.log('User idle again')
+          }
+        }
+      })
+    }
+  )
+```
+
+### Reminder System
+
+```javascript
+const reminderFlow = addKeyword('remind')
+  .addAnswer(
+    'I will remind you in 1 minute',
+    null,
+    async (ctx, { flowDynamic }) => {
+      idleState.setIdleTime({
+        from: ctx.from,
+        inRef: `reminder-${Date.now()}`,
+        timeInSeconds: 60,
+        cb: async ({ next, inRef }) => {
+          if (next) {
+            await flowDynamic('This is your reminder!')
+            console.log(`Reminder ${inRef} triggered`)
+          }
+        }
+      })
+    }
+  )
+```
+
+### Abandoned Cart
+
+```javascript
+const cartFlow = addKeyword('checkout')
+  .addAnswer(
+    'Review your cart and confirm',
+    null,
+    async (ctx, { state, flowDynamic }) => {
+      const cart = state.get('cart') || []
+      
+      idleState.setIdleTime({
+        from: ctx.from,
+        inRef: 'checkout',
+        timeInSeconds: 180, // 3 minutes
+        cb: async ({ next }) => {
+          if (next && cart.length > 0) {
+            await flowDynamic([
+              'You have items in your cart!',
+              'Type "checkout" to complete your purchase'
+            ])
+          }
+        }
+      })
+    }
+  )
+```
+
+## Notes
+
+- Idle timers are checked every second
+- Multiple timers can exist for the same user with different references
+- Timers are automatically cleaned up after execution
+- The `stop` method stops all timers for a user, regardless of reference
+- Timers persist until triggered or manually stopped

@@ -1,0 +1,153 @@
+---
+title: BuilderBot - TypeScript Framework for Chatbots
+description: Build automated conversation flows for WhatsApp and multiple messaging platforms with an agnostic, TypeScript-based framework.
+---
+
+<img
+  className="block dark:hidden"
+  src="https://builderbot.app/assets/thumbnail-vector.png"
+  alt="BuilderBot Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="https://builderbot.app/assets/thumbnail-vector.png"
+  alt="BuilderBot Hero Dark"
+/>
+
+## Build Powerful Chatbots in Minutes
+
+BuildBot is a TypeScript framework that lets you build automated conversation flows agnostic to the WhatsApp provider. You can set up automated responses for frequently asked questions, receive and respond to messages automatically, and track interactions with customers. The framework provides an extensible architecture with triggers to expand functionalities limitlessly.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get your first chatbot running in under 5 minutes
+  </Card>
+  <Card
+    title="Installation Guide"
+    icon="download"
+    href="/installation"
+  >
+    Detailed setup instructions for all environments
+  </Card>
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/concepts"
+  >
+    Learn about flows, providers, and databases
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference"
+  >
+    Complete API documentation and examples
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={3}>
+  <Card title="Provider Agnostic" icon="plug">
+    Works with Baileys, Meta, Twilio, WPPConnect, Telegram, and more. Switch providers without changing your code.
+  </Card>
+  <Card title="Flexible Database" icon="database">
+    Choose from MongoDB, MySQL, PostgreSQL, JSON files, or in-memory storage based on your needs.
+  </Card>
+  <Card title="Conversation Flows" icon="diagram-project">
+    Build complex conversation flows with keywords, answers, actions, and nested flows for dynamic interactions.
+  </Card>
+  <Card title="TypeScript First" icon="code">
+    Written in TypeScript with full type safety and JavaScript support for maximum flexibility.
+  </Card>
+  <Card title="HTTP Integration" icon="webhook">
+    Built-in HTTP server for webhooks, REST APIs, and external integrations.
+  </Card>
+  <Card title="State Management" icon="memory">
+    Maintain conversation state, user data, and custom global state throughout interactions.
+  </Card>
+</CardGroup>
+
+## Supported Platforms
+
+BuildBot supports multiple messaging platforms through its provider system:
+
+- **WhatsApp**: Baileys, Meta Business API, WPPConnect, Evolution API, Venom, Web WhatsApp
+- **Social Media**: Facebook Messenger, Instagram
+- **SMS**: Twilio, Sherpa
+- **Others**: Telegram, Email, GoHighLevel
+
+## Architecture Overview
+
+BuildBot follows a modular architecture with three core components:
+
+```javascript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import { MemoryDB } from '@builderbot/bot'
+
+// Define conversation flows
+const welcomeFlow = createFlow([...])
+
+// Choose your provider
+const provider = createProvider(BaileysProvider)
+
+// Select your database
+const database = new MemoryDB()
+
+// Create the bot instance
+const bot = await createBot({
+  flow: welcomeFlow,
+  provider: provider,
+  database: database
+})
+```
+
+### Flow System
+
+Flows define your conversation logic using a declarative API:
+
+- **addKeyword**: Trigger flows based on user messages
+- **addAnswer**: Send responses with delays, media, and capture options
+- **addAction**: Execute custom logic and integrate external services
+
+### Provider Layer
+
+Providers handle the communication with messaging platforms. You can switch providers without modifying your flow logic, making your bot portable across different platforms.
+
+### Database Layer
+
+The database layer persists user data, conversation state, and custom information. Choose the storage solution that fits your scale and requirements.
+
+## Community and Support
+
+Join thousands of developers building with BuildBot:
+
+<CardGroup cols={2}>
+  <Card
+    title="Discord Community"
+    icon="discord"
+    href="https://link.codigoencasa.com/DISCORD"
+  >
+    Get help, share projects, and connect with other developers
+  </Card>
+  <Card
+    title="Follow on X"
+    icon="twitter"
+    href="https://twitter.com/leifermendez"
+  >
+    Stay updated with the latest features and announcements
+  </Card>
+</CardGroup>
+
+## Open Source
+
+BuildBot is open source and available on [GitHub](https://github.com/codigoencasa/bot-whatsapp). Contributions are welcome!
+
+<Info>
+  **Ready to build?** Start with our [Quick Start Guide](/quickstart) to create your first chatbot in minutes.
+</Info>

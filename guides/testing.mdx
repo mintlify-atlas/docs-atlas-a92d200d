@@ -1,0 +1,561 @@
+---
+title: Testing Your Bot
+description: Learn how to test your BuilderBot flows and logic
+---
+
+Testing ensures your bot works correctly before deploying to production. BuilderBot provides testing utilities and patterns to help you validate flows, state management, and integrations.
+
+## Testing Approaches
+
+You can test your bot in multiple ways:
+
+1. **Manual testing** - Interact with your bot via WhatsApp
+2. **Mock provider testing** - Use the built-in test provider
+3. **API testing** - Test HTTP endpoints with tools like cURL or Postman
+4. **Unit testing** - Test individual flow components
+
+## Mock Provider Testing
+
+BuilderBot includes a `TestProvider` for testing without WhatsApp:
+
+```javascript
+import { createBot, createFlow, addKeyword } from '@builderbot/bot'
+import { TestTool } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+    .addAnswer('Welcome!')
+    .addAnswer('How can I help you?')
+
+const testBot = async () => {
+    const adapterFlow = createFlow([welcomeFlow])
+    const adapterProvider = new TestTool.TestProvider()
+    const adapterDB = new TestTool.TestDB()
+
+    await createBot({
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    })
+
+    console.log('Test bot initialized')
+}
+
+testBot()
+```
+
+## Testing Flows
+
+### Basic Flow Test
+
+Test that a flow responds correctly:
+
+```javascript
+import { addKeyword } from '@builderbot/bot'
+
+const greetFlow = addKeyword(['hi', 'hello'])
+    .addAnswer('Hello! Welcome to our bot')
+    .addAnswer('Type *menu* to see options')
+
+// Verify flow structure
+const flowJson = greetFlow.toJson()
+console.log('Flow has', flowJson.length, 'messages')
+console.log('Keywords:', flowJson[0].keyword)
+```
+
+### Testing Capture
+
+Test flows that capture user input:
+
+<Steps>
+  <Step title="Create a flow with capture">
+    ```javascript
+    const registerFlow = addKeyword('register')
+        .addAnswer(
+            'What is your name?',
+            { capture: true },
+            async (ctx, { state }) => {
+                await state.update({ name: ctx.body })
+            }
+        )
+        .addAnswer(
+            'What is your email?',
+            { capture: true },
+            async (ctx, { state }) => {
+                await state.update({ email: ctx.body })
+            }
+        )
+        .addAction(async (ctx, { flowDynamic, state }) => {
+            await flowDynamic(`Registered: ${state.get('name')}`)
+        })
+    ```
+  </Step>
+
+  <Step title="Simulate user input">
+    ```javascript
+    // Manual test by messaging "register"
+    // Then respond with name
+    // Then respond with email
+    // Verify final message contains the name
+    ```
+  </Step>
+</Steps>
+
+### Testing State
+
+Verify state is stored correctly:
+
+```javascript
+const stateTestFlow = addKeyword('state-test')
+    .addAction(async (ctx, { state, flowDynamic }) => {
+        // Set state
+        await state.update({ testKey: 'testValue', count: 1 })
+        
+        // Read state
+        const value = state.get('testKey')
+        const count = state.get('count')
+        
+        // Verify
+        if (value === 'testValue' && count === 1) {
+            await flowDynamic('✅ State test passed')
+        } else {
+            await flowDynamic('❌ State test failed')
+        }
+    })
+```
+
+## Testing HTTP Endpoints
+
+### Using cURL
+
+Test your API endpoints:
+
+```bash
+# Test message sending
+curl -X POST http://localhost:3008/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "message": "Test message"
+  }'
+
+# Test flow trigger
+curl -X POST http://localhost:3008/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "name": "Test User"
+  }'
+
+# Test blacklist
+curl -X POST http://localhost:3008/v1/blacklist \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "intent": "add"
+  }'
+
+# Get blacklist
+curl http://localhost:3008/v1/blacklist/list
+```
+
+### Test Script
+
+Create a test script for automated API testing:
+
+```javascript
+// test-api.js
+const testAPI = async () => {
+    const baseUrl = 'http://localhost:3008'
+    const testNumber = '1234567890'
+
+    // Test 1: Send message
+    console.log('Test 1: Sending message...')
+    const response1 = await fetch(`${baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            number: testNumber,
+            message: 'Test message'
+        })
+    })
+    console.log('✅ Message sent:', await response1.text())
+
+    // Test 2: Add to blacklist
+    console.log('Test 2: Adding to blacklist...')
+    const response2 = await fetch(`${baseUrl}/v1/blacklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            number: testNumber,
+            intent: 'add'
+        })
+    })
+    console.log('✅ Blacklist updated:', await response2.json())
+
+    // Test 3: Get blacklist
+    console.log('Test 3: Getting blacklist...')
+    const response3 = await fetch(`${baseUrl}/v1/blacklist/list`)
+    const data = await response3.json()
+    console.log('✅ Blacklist:', data.blacklist)
+
+    // Test 4: Remove from blacklist
+    console.log('Test 4: Removing from blacklist...')
+    const response4 = await fetch(`${baseUrl}/v1/blacklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            number: testNumber,
+            intent: 'remove'
+        })
+    })
+    console.log('✅ Removed:', await response4.json())
+}
+
+testAPI().catch(console.error)
+```
+
+Run the test:
+
+```bash
+node test-api.js
+```
+
+## Testing Media Files
+
+Verify media sending works:
+
+```javascript
+const mediaTestFlow = addKeyword('test-media')
+    .addAnswer('Testing local image...', {
+        media: join(process.cwd(), 'assets', 'test.png')
+    })
+    .addAnswer('Testing URL image...', {
+        media: 'https://via.placeholder.com/150'
+    })
+    .addAnswer('Testing video...', {
+        media: 'https://www.w3schools.com/html/mov_bbb.mp4'
+    })
+    .addAnswer('Media tests complete!')
+```
+
+### Media Test Checklist
+
+<Accordion title="Image Tests">
+  - [ ] Local PNG file
+  - [ ] Local JPG file
+  - [ ] URL image
+  - [ ] Large image (test timeout)
+  - [ ] Invalid path (error handling)
+</Accordion>
+
+<Accordion title="Video Tests">
+  - [ ] Local MP4 file
+  - [ ] URL video
+  - [ ] Large video file
+  - [ ] Invalid format
+</Accordion>
+
+<Accordion title="Document Tests">
+  - [ ] PDF file
+  - [ ] DOCX file
+  - [ ] XLSX file
+  - [ ] Invalid file type
+</Accordion>
+
+## Testing Error Handling
+
+Test how your bot handles errors:
+
+```javascript
+const errorTestFlow = addKeyword('test-error')
+    .addAction(async (ctx, { flowDynamic }) => {
+        try {
+            // Simulate error
+            throw new Error('Test error')
+        } catch (error) {
+            console.error('Error caught:', error.message)
+            await flowDynamic('Error handled gracefully')
+        }
+    })
+```
+
+### Testing Validation
+
+```javascript
+const validationFlow = addKeyword('email')
+    .addAnswer(
+        'Enter your email:',
+        { capture: true },
+        async (ctx, { fallBack, flowDynamic }) => {
+            const email = ctx.body.trim()
+            
+            // Test validation
+            if (!email.includes('@')) {
+                return fallBack('❌ Invalid email format')
+            }
+            
+            await flowDynamic('✅ Valid email')
+        }
+    )
+```
+
+## Performance Testing
+
+### Queue Load Test
+
+Test queue behavior under load:
+
+```javascript
+const loadTestFlow = addKeyword('load-test')
+    .addAction(async (ctx, { flowDynamic }) => {
+        console.time('load-test')
+        
+        // Send 50 messages
+        for (let i = 1; i <= 50; i++) {
+            await flowDynamic(`Message ${i}/50`)
+        }
+        
+        console.timeEnd('load-test')
+        await flowDynamic('Load test complete!')
+    })
+```
+
+### Concurrent Users Test
+
+Simulate multiple users via API:
+
+```javascript
+// concurrent-test.js
+const testConcurrentUsers = async () => {
+    const baseUrl = 'http://localhost:3008'
+    const users = Array.from({ length: 10 }, (_, i) => `user${i}`)
+
+    console.log('Testing 10 concurrent users...')
+    
+    const promises = users.map(user => 
+        fetch(`${baseUrl}/v1/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                number: user,
+                message: 'Concurrent test'
+            })
+        })
+    )
+
+    await Promise.all(promises)
+    console.log('✅ All requests completed')
+}
+
+testConcurrentUsers()
+```
+
+## Test Checklist
+
+Use this checklist before deploying:
+
+### Flow Tests
+
+- [ ] All keywords trigger correct flows
+- [ ] Capture works and stores data
+- [ ] State updates correctly
+- [ ] fallBack repeats messages
+- [ ] gotoFlow navigates correctly
+- [ ] endFlow stops conversation
+- [ ] Nested flows work
+- [ ] Dynamic responses work
+
+### Media Tests
+
+- [ ] Images send from local files
+- [ ] Images send from URLs
+- [ ] Videos send correctly
+- [ ] Audio files send
+- [ ] Documents send
+- [ ] Large files timeout appropriately
+
+### API Tests
+
+- [ ] Message endpoint works
+- [ ] Flow trigger endpoint works
+- [ ] Blacklist endpoints work
+- [ ] State endpoints work
+- [ ] Error responses are correct
+- [ ] Authentication works (if implemented)
+
+### Integration Tests
+
+- [ ] Database saves messages
+- [ ] Database retrieves history
+- [ ] Provider connects successfully
+- [ ] QR code displays (for Baileys)
+- [ ] Messages send to real WhatsApp
+
+### Performance Tests
+
+- [ ] Queue handles multiple messages
+- [ ] Concurrent users don't conflict
+- [ ] Memory usage is reasonable
+- [ ] No memory leaks
+- [ ] Logs are created correctly
+
+## Debugging Tips
+
+<Accordion title="Check logs">
+  View bot logs to debug issues:
+  ```bash
+  # Core logs
+  tail -f core.class.log
+  
+  # Queue logs
+  tail -f queue.class.log
+  
+  # Search for errors
+  grep ERROR *.log
+  ```
+</Accordion>
+
+<Accordion title="Add debug logging">
+  Add console logs to track flow:
+  ```javascript
+  const debugFlow = addKeyword('debug')
+      .addAction(async (ctx, { state, flowDynamic }) => {
+          console.log('Context:', ctx)
+          console.log('State:', state.getMyState())
+          
+          await flowDynamic('Check console for debug info')
+      })
+  ```
+</Accordion>
+
+<Accordion title="Test in isolation">
+  Test individual components separately:
+  ```javascript
+  // Test only one flow at a time
+  const adapterFlow = createFlow([testFlow])  // Not all flows
+  ```
+</Accordion>
+
+<Accordion title="Use test numbers">
+  Create dedicated test numbers:
+  ```javascript
+  const TEST_NUMBERS = ['1111111111', '2222222222']
+  
+  const isTestNumber = (number) => TEST_NUMBERS.includes(number)
+  
+  // Add debug info for test numbers
+  if (isTestNumber(ctx.from)) {
+      console.log('Test user:', ctx)
+  }
+  ```
+</Accordion>
+
+## Common Test Scenarios
+
+### Test User Registration
+
+```javascript
+// 1. Trigger registration
+// Send: "register"
+// Expect: "What is your name?"
+
+// 2. Provide name
+// Send: "John Doe"
+// Expect: "What is your email?"
+
+// 3. Provide email
+// Send: "john@example.com"
+// Expect: "Registered: John Doe"
+
+// 4. Verify state
+// Check that name and email are stored in state
+```
+
+### Test Error Recovery
+
+```javascript
+// 1. Trigger flow with validation
+// Send: "email"
+// Expect: "Enter your email:"
+
+// 2. Send invalid email
+// Send: "notanemail"
+// Expect: "Invalid email format"
+
+// 3. Send valid email
+// Send: "valid@email.com"
+// Expect: "Valid email"
+```
+
+### Test Media Sending
+
+```javascript
+// 1. Request media
+// Send: "samples"
+// Expect: Confirmation message
+
+// 2. Receive media
+// Expect: Image file
+// Expect: Video file
+// Expect: Audio file
+// Expect: PDF file
+```
+
+## Best Practices
+
+<Accordion title="Test after every change">
+  Run tests after modifying flows:
+  ```bash
+  # Quick test
+  node test-api.js
+  
+  # Manual test
+  # Send "test" message to bot
+  ```
+</Accordion>
+
+<Accordion title="Keep test data separate">
+  Use dedicated test numbers and data:
+  ```javascript
+  const TEST_MODE = process.env.NODE_ENV === 'test'
+  
+  if (TEST_MODE) {
+      console.log('Running in test mode')
+  }
+  ```
+</Accordion>
+
+<Accordion title="Document test cases">
+  Keep a list of test scenarios:
+  ```markdown
+  # Test Cases
+  
+  ## Registration Flow
+  1. User sends "register"
+  2. Bot asks for name
+  3. User provides name
+  4. Bot asks for email
+  5. User provides email
+  6. Bot confirms registration
+  ```
+</Accordion>
+
+<Accordion title="Automate repetitive tests">
+  Create scripts for common tests:
+  ```javascript
+  // test-suite.js
+  const runTests = async () => {
+      await testMessages()
+      await testFlows()
+      await testBlacklist()
+      await testMedia()
+      console.log('All tests passed!')
+  }
+  ```
+</Accordion>
+
+## Next Steps
+
+- Review [Creating Flows](/guides/creating-flows) to improve your flows
+- Check [Queue System](/guides/queue-system) to optimize performance
+- Explore [State Management](/guides/state-management) to test state handling

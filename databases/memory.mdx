@@ -1,0 +1,153 @@
+---
+title: MemoryDB
+description: In-memory database adapter for development and testing
+---
+
+MemoryDB is the simplest database adapter, storing conversation history in memory. It's perfect for development, testing, and stateless bots.
+
+<Warning>
+  All data is lost when the bot restarts. Use MemoryDB only for development or when persistence is not required.
+</Warning>
+
+## Installation
+
+MemoryDB is included in the core `@builderbot/bot` package - no additional installation needed.
+
+```bash
+npm install @builderbot/bot
+```
+
+## Basic Usage
+
+```typescript
+import { createBot, createFlow, createProvider } from '@builderbot/bot'
+import { MemoryDB as Database } from '@builderbot/bot'
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterDB = new Database()
+  
+  await createBot({
+    flow: createFlow([]),
+    provider: createProvider(Provider),
+    database: adapterDB
+  })
+}
+
+main()
+```
+
+## How It Works
+
+MemoryDB stores conversation history in a simple array:
+
+```typescript packages/bot/src/db/index.ts
+class MemoryDB {
+  public listHistory: any[] = []
+
+  async getPrevByNumber(from: string): Promise<any> {
+    const history = this.listHistory
+      .slice()
+      .reverse()
+      .filter((i) => !!i.keyword)
+    return history.find((a) => a.from === from)
+  }
+
+  async save(ctx: any): Promise<void> {
+    this.listHistory.push(ctx)
+  }
+}
+```
+
+## Features
+
+<Check>Zero configuration required</Check>
+<Check>No external dependencies</Check>
+<Check>Fast read/write operations</Check>
+<Check>Perfect for testing flows</Check>
+
+## Limitations
+
+<Warning>No persistence - data lost on restart</Warning>
+<Warning>Limited by available RAM</Warning>
+<Warning>Not suitable for production</Warning>
+<Warning>Cannot scale across multiple servers</Warning>
+
+## When to Use MemoryDB
+
+### Good Use Cases
+
+- **Local development**: Quick iteration without database setup
+- **Unit testing**: Clean state for each test run
+- **Proof of concepts**: Validate ideas before adding infrastructure
+- **Stateless bots**: When you don't need to remember user context
+
+### When NOT to Use
+
+- Production deployments
+- Multi-server setups
+- When conversation history is important
+- High-traffic applications
+
+## Migration to Persistent Storage
+
+When you're ready to move to production, switching to a persistent database is easy:
+
+<CodeGroup>
+```typescript Before (Memory)
+import { MemoryDB as Database } from '@builderbot/bot'
+
+const adapterDB = new Database()
+```
+
+```typescript After (JSON)
+import { JsonFileDB as Database } from '@builderbot/database-json'
+
+const adapterDB = new Database({ filename: 'db.json' })
+```
+
+```typescript After (MongoDB)
+import { MongoAdapter as Database } from '@builderbot/database-mongo'
+
+const adapterDB = new Database({
+  dbUri: process.env.MONGO_DB_URI,
+  dbName: process.env.MONGO_DB_NAME
+})
+```
+</CodeGroup>
+
+## TypeScript Support
+
+Use MemoryDB with full type safety:
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const welcomeFlow = addKeyword<BaileysProvider, MemoryDB>(['hello'])
+  .addAnswer('Hi! How can I help you?')
+```
+
+## Debugging
+
+Access the in-memory history for debugging:
+
+```typescript
+const adapterDB = new Database()
+
+// Later in your code
+console.log('Current history:', adapterDB.listHistory)
+console.log('Total entries:', adapterDB.listHistory.length)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JSON Database" icon="file" href="/databases/json">
+    Add simple file-based persistence
+  </Card>
+  <Card title="MongoDB" icon="leaf" href="/databases/mongodb">
+    Scale with a production database
+  </Card>
+</CardGroup>

@@ -1,0 +1,419 @@
+---
+title: Evolution API Provider
+description: WhatsApp integration via Evolution API
+---
+
+The Evolution API provider connects to a self-hosted or cloud-hosted Evolution API instance, providing a robust HTTP API interface for WhatsApp automation.
+
+## Features
+
+- HTTP API interface for WhatsApp
+- Text and media messaging
+- Image, video, audio, and document support
+- Base64 media encoding
+- File size validation (10MB limit)
+- Message queuing
+- Session management via API
+- Connection state monitoring
+
+## Prerequisites
+
+<Steps>
+  <Step title="Evolution API Instance">
+    Set up an Evolution API instance (self-hosted or cloud)
+  </Step>
+  
+  <Step title="Create Instance">
+    Create a WhatsApp instance in Evolution API
+  </Step>
+  
+  <Step title="Get Credentials">
+    Obtain:
+    - API Key
+    - Instance Name
+    - Base URL
+  </Step>
+  
+  <Step title="Connect WhatsApp">
+    Connect your WhatsApp account to the instance
+  </Step>
+</Steps>
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-evolution-api
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { EvolutionProvider } from '@builderbot/provider-evolution-api'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(EvolutionProvider, {
+  apiKey: 'YOUR_API_KEY',
+  instanceName: 'YOUR_INSTANCE_NAME',
+  baseURL: 'http://localhost:8080',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Environment Variables
+
+```env
+EVOLUTION_API_KEY=your_api_key
+EVOLUTION_INSTANCE_NAME=my-instance
+EVOLUTION_BASE_URL=http://localhost:8080
+PORT=3000
+```
+
+```typescript
+const provider = createProvider(EvolutionProvider, {
+  apiKey: process.env.EVOLUTION_API_KEY,
+  instanceName: process.env.EVOLUTION_INSTANCE_NAME,
+  baseURL: process.env.EVOLUTION_BASE_URL || 'http://localhost:8080'
+})
+```
+
+## Basic Usage
+
+### Sending Text Messages
+
+```typescript
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to our service')
+  .addAnswer('How can we assist you?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('media')
+  // Send image from local file
+  .addAnswer('Here is an image:', {
+    media: './assets/image.jpg'
+  })
+  // Send image from URL
+  .addAnswer('Image from URL:', {
+    media: 'https://example.com/image.jpg'
+  })
+  // Send video
+  .addAnswer('Check this video:', {
+    media: './assets/video.mp4'
+  })
+  // Send audio
+  .addAnswer('Listen to this:', {
+    media: './assets/audio.mp3'
+  })
+  // Send document
+  .addAnswer('Here is a PDF:', {
+    media: './assets/document.pdf'
+  })
+```
+
+## Direct API Usage
+
+### Send Image
+
+```typescript
+const imageFlow = addKeyword('image')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendImage(
+      ctx.from,
+      './path/to/image.jpg',
+      'Check out this image!'
+    )
+  })
+```
+
+### Send Video
+
+```typescript
+const videoFlow = addKeyword('video')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendVideo(
+      ctx.from,
+      './path/to/video.mp4',
+      'Watch this video'
+    )
+  })
+```
+
+### Send Audio
+
+```typescript
+const audioFlow = addKeyword('audio')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendAudio(
+      ctx.from,
+      './path/to/audio.mp3'
+    )
+  })
+```
+
+<Note>
+  Audio files must be in OPUS codec format for voice notes. The provider automatically sets the mimetype to `audio/ogg; codecs=opus`.
+</Note>
+
+### Send Document
+
+```typescript
+const documentFlow = addKeyword('document')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendFile(
+      ctx.from,
+      './path/to/document.pdf',
+      'Here is the requested document'
+    )
+  })
+```
+
+## Receiving Media
+
+```typescript
+import { join } from 'path'
+
+const receiveMediaFlow = addKeyword('MEDIA')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    // Save the received file
+    const filePath = await provider.saveFile(ctx, {
+      path: join(process.cwd(), 'downloads')
+    })
+    
+    await flowDynamic(`File saved at: ${filePath}`)
+  })
+```
+
+## Advanced Features
+
+### Sending Text with Options
+
+```typescript
+const textFlow = addKeyword('info')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendText(
+      ctx.from,
+      'This is a text message with no delay'
+    )
+  })
+```
+
+### Custom API Requests
+
+You can send custom requests to Evolution API:
+
+```typescript
+const customFlow = addKeyword('custom')
+  .addAction(async (ctx, { provider }) => {
+    const response = await provider.sendMessageToApi(
+      {
+        number: ctx.from,
+        text: 'Custom message',
+        delay: 1000
+      },
+      '/message/sendText/'
+    )
+    console.log('Response:', response)
+  })
+```
+
+## Webhook Configuration
+
+### Webhook Endpoints
+
+The provider sets up these endpoints:
+
+```
+POST /       - Home endpoint
+POST /webhook - Receive messages from Evolution API
+```
+
+### Evolution API Webhook Setup
+
+1. Configure webhook in your Evolution API instance
+2. Set webhook URL: `https://your-domain.com/webhook`
+3. Enable message events
+
+## Connection State
+
+The provider automatically checks connection state on startup:
+
+```typescript
+provider.on('ready', () => {
+  console.log('Evolution API connected and ready!')
+})
+
+provider.on('notice', ({ title, instructions }) => {
+  console.log(title)
+  console.log(instructions)
+})
+```
+
+## File Size Limits
+
+The provider enforces a 10MB file size limit:
+
+```typescript
+// Files larger than 10MB will throw an error
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+```
+
+## Media Type Detection
+
+The provider automatically detects media types:
+
+```typescript
+const autoMediaFlow = addKeyword('send')
+  .addAction(async (ctx, { provider }) => {
+    // Automatically detects if it's image, video, audio, or document
+    await provider.sendMedia(
+      ctx.from,
+      'https://example.com/file.jpg', // URL or local path
+      'Check this out!'
+    )
+  })
+```
+
+## Error Handling
+
+```typescript
+provider.on('notice', ({ title, instructions }) => {
+  if (title.includes('ERROR')) {
+    console.error('Connection error:', instructions)
+  }
+})
+
+try {
+  await provider.sendMessage(number, message)
+} catch (error) {
+  console.error('Failed to send message:', error.message)
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="File Management">
+    - Keep media files under 10MB
+    - Use appropriate file formats
+    - Clean up temporary files after sending
+  </Accordion>
+
+  <Accordion title="Connection State">
+    - Monitor the `ready` event
+    - Handle connection failures gracefully
+    - Implement retry logic for critical messages
+  </Accordion>
+
+  <Accordion title="Message Queuing">
+    - Messages are automatically queued
+    - Default: 1 concurrent message, 100ms interval
+    - Prevents rate limiting issues
+  </Accordion>
+
+  <Accordion title="Security">
+    - Keep API key secure (use environment variables)
+    - Use HTTPS for production
+    - Implement proper authentication for webhooks
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection Failed">
+    - Verify Evolution API is running
+    - Check `baseURL` is correct
+    - Ensure API key is valid
+    - Verify instance exists and is connected
+  </Accordion>
+
+  <Accordion title="File Upload Errors">
+    - Check file size (must be under 10MB)
+    - Verify file format is supported
+    - Ensure file path is correct
+    - Check file permissions
+  </Accordion>
+
+  <Accordion title="Webhook Not Working">
+    - Verify webhook URL is publicly accessible
+    - Check Evolution API webhook configuration
+    - Review network/firewall settings
+    - Enable Evolution API logging for debugging
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Bot
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { EvolutionProvider } from '@builderbot/provider-evolution-api'
+import { MemoryDB } from '@builderbot/bot'
+import { join } from 'path'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('👋 Hello! Welcome to our service')
+  .addAnswer('How can we help you today?')
+
+const mediaFlow = addKeyword('files')
+  .addAnswer('I\'ll send you some files...')
+  .addAnswer('Image:', { media: join(process.cwd(), 'assets', 'image.png') })
+  .addAnswer('Document:', { media: join(process.cwd(), 'assets', 'doc.pdf') })
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow, mediaFlow])
+  
+  const adapterProvider = createProvider(EvolutionProvider, {
+    apiKey: process.env.EVOLUTION_API_KEY,
+    instanceName: process.env.EVOLUTION_INSTANCE_NAME,
+    baseURL: process.env.EVOLUTION_BASE_URL || 'http://localhost:8080'
+  })
+  
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(3000)
+}
+
+main()
+```
+
+## API Response Types
+
+The Evolution API provider returns typed responses:
+
+```typescript
+interface ApiResponse {
+  key?: {
+    remoteJid: string
+    fromMe: boolean
+    id: string
+  }
+  message?: any
+  messageTimestamp?: string
+  status?: string
+}
+```
+
+## Further Resources
+
+- [Evolution API Documentation](https://doc.evolution-api.com)
+- [Evolution API GitHub](https://github.com/EvolutionAPI/evolution-api)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

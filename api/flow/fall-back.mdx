@@ -1,0 +1,289 @@
+---
+title: fallBack
+description: Repeat the previous message to allow users to retry their input
+---
+
+The `fallBack` method repeats the last message sent to the user, allowing them to retry their input. This is particularly useful for input validation and error handling.
+
+## Signature
+
+```typescript
+fallBack(message?: string): Promise<void>
+```
+
+## Parameters
+
+<ParamField path="message" type="string" optional>
+  Custom message to display instead of the original message. If omitted, the original message text is repeated.
+</ParamField>
+
+## Return Value
+
+Returns a `Promise<void>` that resolves when the message is sent.
+
+## How It Works
+
+1. **Clears queue** - Removes any pending messages from the conversation queue
+2. **Sets fallback flag** - Marks the interaction as a fallback in internal state
+3. **Resends message** - Sends either the custom message or the original previous message
+4. **Preserves context** - Maintains the same flow step and conversation state
+5. **Waits for input** - If the previous message had `capture: true`, waits for user input again
+
+## Usage Examples
+
+### Basic Input Validation
+
+Validate user input and ask again if invalid:
+
+```typescript
+const ageFlow = addKeyword('age')
+  .addAnswer(
+    'Please enter your age (must be 18 or older)',
+    { capture: true },
+    async (ctx, { fallBack }) => {
+      const age = parseInt(ctx.body)
+      
+      if (isNaN(age) || age < 18) {
+        return fallBack('Invalid age. You must be 18 or older.')
+      }
+      
+      // Continue with valid age
+    }
+  )
+```
+
+### Email Validation
+
+Ensure user provides a valid email format:
+
+```typescript
+const emailFlow = addKeyword('email')
+  .addAnswer(
+    'Please enter your email address',
+    { capture: true },
+    async (ctx, { fallBack, state }) => {
+      const email = ctx.body
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      
+      if (!emailRegex.test(email)) {
+        return fallBack('That doesn\'t look like a valid email. Please try again.')
+      }
+      
+      await state.update({ email })
+    }
+  )
+```
+
+### Multiple Choice Validation
+
+Validate menu selections:
+
+```typescript
+const menuFlow = addKeyword('menu')
+  .addAnswer(
+    ['Select an option:', '1. Sales', '2. Support', '3. Information'].join('\n'),
+    { capture: true },
+    async (ctx, { fallBack, gotoFlow }) => {
+      const option = ctx.body
+      
+      if (!['1', '2', '3'].includes(option)) {
+        return fallBack('Please select a valid option (1, 2, or 3)')
+      }
+      
+      // Handle valid options
+      if (option === '1') return gotoFlow(salesFlow)
+      if (option === '2') return gotoFlow(supportFlow)
+      if (option === '3') return gotoFlow(infoFlow)
+    }
+  )
+```
+
+### Repeating Original Message
+
+Use fallBack without custom message to repeat the exact previous text:
+
+```typescript
+const confirmFlow = addKeyword('confirm')
+  .addAnswer(
+    'Type YES to confirm or NO to cancel',
+    { capture: true },
+    async (ctx, { fallBack }) => {
+      const response = ctx.body.toLowerCase()
+      
+      if (response !== 'yes' && response !== 'no') {
+        return fallBack() // Repeats: "Type YES to confirm or NO to cancel"
+      }
+    }
+  )
+```
+
+### Limited Retry Attempts
+
+Implement retry limits with fallBack:
+
+```typescript
+const passwordFlow = addKeyword('password')
+  .addAnswer(
+    'Enter your password',
+    { capture: true },
+    async (ctx, { state, fallBack, endFlow }) => {
+      const attempts = state.get('attempts') || 0
+      const password = ctx.body
+      
+      if (attempts >= 2) {
+        return endFlow('Maximum attempts reached. Please contact support.')
+      }
+      
+      const isValid = await validatePassword(password)
+      
+      if (!isValid) {
+        await state.update({ attempts: attempts + 1 })
+        return fallBack(`Incorrect password. ${2 - attempts} attempts remaining.`)
+      }
+      
+      // Password is valid
+      await state.update({ attempts: 0 })
+    }
+  )
+```
+
+### Numeric Range Validation
+
+```typescript
+const ratingFlow = addKeyword('rating')
+  .addAnswer(
+    'Rate our service from 1 to 5',
+    { capture: true },
+    async (ctx, { fallBack, state }) => {
+      const rating = parseInt(ctx.body)
+      
+      if (isNaN(rating) || rating < 1 || rating > 5) {
+        return fallBack('Please enter a number between 1 and 5')
+      }
+      
+      await state.update({ rating })
+    }
+  )
+```
+
+## Important Notes
+
+<Warning>
+  **Queue Clearing**: `fallBack` clears the message queue before resending. Any messages queued after the current step will be discarded.
+</Warning>
+
+<Note>
+  - `fallBack` maintains the **same flow position** - it doesn't restart the flow
+  - User state is **preserved** across fallBack calls
+  - The method is **asynchronous** and returns a Promise
+  - Works best with `capture: true` to wait for user input
+  - Buttons and media from the original message are preserved
+</Note>
+
+## Common Patterns
+
+### Format Validation with Hints
+
+```typescript
+const phoneFlow = addKeyword('phone')
+  .addAnswer(
+    'Enter your phone number (format: +1234567890)',
+    { capture: true },
+    async (ctx, { fallBack }) => {
+      const phone = ctx.body.replace(/\s/g, '')
+      const phoneRegex = /^\+\d{10,15}$/
+      
+      if (!phoneRegex.test(phone)) {
+        return fallBack(
+          'Invalid format. Please use international format: +1234567890'
+        )
+      }
+    }
+  )
+```
+
+### Keyword Matching
+
+```typescript
+const languageFlow = addKeyword('language')
+  .addAnswer(
+    'Choose your language: English, Spanish, French',
+    { capture: true },
+    async (ctx, { fallBack, state }) => {
+      const lang = ctx.body.toLowerCase()
+      const validLanguages = ['english', 'spanish', 'french']
+      
+      if (!validLanguages.includes(lang)) {
+        return fallBack('Please choose: English, Spanish, or French')
+      }
+      
+      await state.update({ language: lang })
+    }
+  )
+```
+
+### Complex Validation Logic
+
+```typescript
+const documentFlow = addKeyword('document')
+  .addAnswer(
+    'Enter your document number (8 digits)',
+    { capture: true },
+    async (ctx, { fallBack }) => {
+      const doc = ctx.body.trim()
+      
+      // Multiple validation checks
+      if (!/^\d{8}$/.test(doc)) {
+        return fallBack('Document must be exactly 8 digits')
+      }
+      
+      if (await isDocumentRegistered(doc)) {
+        return fallBack('This document is already registered')
+      }
+      
+      // Valid document
+    }
+  )
+```
+
+### Combining with State
+
+```typescript
+const quizFlow = addKeyword('quiz')
+  .addAnswer(
+    'What is 2 + 2?',
+    { capture: true },
+    async (ctx, { state, fallBack, flowDynamic }) => {
+      const answer = ctx.body
+      const wrongAttempts = state.get('wrongAttempts') || 0
+      
+      if (answer !== '4') {
+        await state.update({ wrongAttempts: wrongAttempts + 1 })
+        
+        if (wrongAttempts >= 2) {
+          await flowDynamic('Hint: Two plus two equals four')
+        }
+        
+        return fallBack('Try again!')
+      }
+      
+      await flowDynamic('Correct!')
+    }
+  )
+```
+
+## Difference from Other Methods
+
+| Feature | `fallBack` | `endFlow` | `gotoFlow` |
+|---------|------------|-----------|------------|
+| **Purpose** | Retry input | End conversation | Navigate flow |
+| **Queue** | Clears queue | Clears queue | Clears queue |
+| **Position** | Same step | Exits flow | New flow |
+| **State** | Preserved | Preserved | Preserved |
+| **Use case** | Validation | Termination | Navigation |
+
+## Related Methods
+
+- [`gotoFlow`](/api/flow/goto-flow) - Navigate to a different flow
+- [`endFlow`](/api/flow/end-flow) - End the conversation flow
+- [`flowDynamic`](/api/flow/flow-dynamic) - Send dynamic messages

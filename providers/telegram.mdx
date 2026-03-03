@@ -1,0 +1,460 @@
+---
+title: Telegram Provider
+description: Telegram Bot API integration for BuilderBot
+---
+
+The Telegram provider enables building chatbots for Telegram using the official Telegram Bot API via the Telegram client library.
+
+## Features
+
+- Text messaging
+- Media support (images, videos, audio, documents)
+- Voice notes and video notes
+- Buttons and inline keyboards
+- File upload and download
+- User authentication
+- Read message management
+- Unread message retrieval
+- Session persistence
+
+## Prerequisites
+
+<Steps>
+  <Step title="Create Bot with BotFather">
+    Talk to [@BotFather](https://t.me/botfather) on Telegram and create a new bot
+  </Step>
+  
+  <Step title="Get Bot Token">
+    Save the bot token provided by BotFather
+  </Step>
+  
+  <Step title="Get API Credentials">
+    Visit [my.telegram.org/auth](https://my.telegram.org/auth?to=apps) to get:
+    - API ID
+    - API Hash
+  </Step>
+  
+  <Step title="Prepare Phone Number">
+    Have your phone number ready for authentication
+  </Step>
+</Steps>
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-telegram
+```
+
+## Dependencies
+
+The provider uses:
+- `telegram`: ^2.23.10 - Telegram client library (MTProto)
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot/provider-telegram'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(TelegramProvider, {
+  apiId: 12345678,  // Your API ID
+  apiHash: 'your_api_hash',
+  apiNumber: '+1234567890', // Your phone number
+  apiPassword: 'your_2fa_password', // Optional: if 2FA enabled
+  getCode: async () => {
+    // Return the code sent to your Telegram
+    return '12345'
+  }
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Configuration Options
+
+```typescript
+interface TelegramProviderConfig {
+  apiId: number           // Required: Telegram API ID
+  apiHash: string         // Required: Telegram API Hash
+  apiNumber?: string      // Your phone number for authentication
+  apiPassword?: string    // 2FA password if enabled
+  apiCode?: string        // Verification code
+  telegramJwt?: string    // Session string for persistence
+  getCode: () => Promise<string> // Function to get verification code
+  name?: string           // Bot name (default: 'telegram-bot')
+  port?: number           // Server port (default: 3000)
+}
+```
+
+## Authentication Flow
+
+### First Time Setup
+
+```typescript
+const provider = createProvider(TelegramProvider, {
+  apiId: parseInt(process.env.TELEGRAM_API_ID),
+  apiHash: process.env.TELEGRAM_API_HASH,
+  apiNumber: process.env.TELEGRAM_PHONE_NUMBER,
+  getCode: async () => {
+    // Implement your method to get the code
+    // Could be from console input, web form, etc.
+    return await askUserForCode()
+  },
+  apiPassword: async () => {
+    // If you have 2FA enabled
+    return process.env.TELEGRAM_PASSWORD
+  }
+})
+```
+
+### Session Persistence
+
+After first login, a session file is created:
+
+```
+{name}_sessions/session.txt
+```
+
+For subsequent runs, you can use the session string:
+
+```typescript
+const provider = createProvider(TelegramProvider, {
+  apiId: parseInt(process.env.TELEGRAM_API_ID),
+  apiHash: process.env.TELEGRAM_API_HASH,
+  telegramJwt: process.env.TELEGRAM_SESSION_STRING
+})
+```
+
+## Basic Usage
+
+### Sending Text Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello', '/start'])
+  .addAnswer('Hello! Welcome to our Telegram bot 👋')
+  .addAnswer('How can I help you today?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('media')
+  // Send image from URL
+  .addAnswer('Here is an image:', {
+    media: 'https://example.com/image.jpg'
+  })
+  // Send video
+  .addAnswer('Check this video:', {
+    media: 'https://example.com/video.mp4'
+  })
+  // Send audio
+  .addAnswer('Listen to this:', {
+    media: 'https://example.com/audio.mp3'
+  })
+```
+
+### Sending Buttons
+
+```typescript
+const buttonFlow = addKeyword('options')
+  .addAnswer(
+    'Choose an option:',
+    {
+      buttons: [
+        { body: 'Option 1' },
+        { body: 'Option 2' },
+        { body: 'Option 3' }
+      ]
+    }
+  )
+```
+
+## Advanced Features
+
+### Sending Media with Custom Method
+
+```typescript
+const sendMediaFlow = addKeyword('send-media')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendMedia(
+      ctx.from,
+      'https://example.com/image.jpg',
+      'Check out this image!'
+    )
+  })
+```
+
+### Sending Voice Notes
+
+Voice notes are automatically detected from file extensions:
+
+```typescript
+const voiceFlow = addKeyword('voice')
+  .addAction(async (ctx, { provider }) => {
+    // Files with .mp3, .wav, .ogg, .oga extensions are sent as voice notes
+    await provider.sendMedia(
+      ctx.from,
+      './audio.ogg',
+      '' // Empty caption for voice notes
+    )
+  })
+```
+
+### Saving Received Files
+
+```typescript
+import { join } from 'path'
+
+const receiveFileFlow = addKeyword('MEDIA')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    const filePath = await provider.saveFile(ctx, {
+      path: join(process.cwd(), 'downloads')
+    })
+    
+    await flowDynamic(`File saved: ${filePath}`)
+  })
+```
+
+### Managing Unread Messages
+
+```typescript
+// Get all unread messages
+const unreadMessages = await provider.getUnreadMessages()
+
+for (const messageGroup of unreadMessages) {
+  for (const message of messageGroup) {
+    console.log('Unread message:', message.text)
+  }
+}
+```
+
+### Mark Messages as Read
+
+```typescript
+const readFlow = addKeyword('read')
+  .addAction(async (ctx, { provider }) => {
+    await provider.markAsRead(ctx.from)
+  })
+```
+
+### Get Responded Conversations
+
+```typescript
+// Get conversations where you were the last to respond
+const respondedConvos = await provider.getRespondedConversations()
+
+for (const message of respondedConvos) {
+  console.log('Last message to:', message.peerId)
+}
+```
+
+## Media Handling
+
+### Supported Media Types
+
+- **Images**: JPG, PNG, GIF
+- **Videos**: MP4, MOV
+- **Audio**: MP3, WAV, OGG (voice notes)
+- **Documents**: PDF, DOC, ZIP, etc.
+
+### Voice vs Audio
+
+The provider automatically determines voice notes:
+
+```typescript
+// These extensions trigger voice note mode:
+const voiceExtensions = ['mp3', 'wav', 'ogg', 'oga']
+```
+
+### Video Notes
+
+To send circular video notes:
+
+```typescript
+const videoNoteFlow = addKeyword('video-note')
+  .addAction(async (ctx, { provider }) => {
+    // Use 'video_note' as caption to send as video note
+    await provider.sendMedia(
+      ctx.from,
+      './video.mp4',
+      'video_note'
+    )
+  })
+```
+
+## Event Handling
+
+### Message Events
+
+The provider processes these message types:
+
+```typescript
+provider.on('message', (payload) => {
+  if (payload.message.voice) {
+    console.log('Received voice note')
+  } else if (payload.message.media) {
+    console.log('Received media:', payload.caption)
+  } else {
+    console.log('Received text:', payload.body)
+  }
+})
+```
+
+### Ready Event
+
+```typescript
+provider.on('ready', () => {
+  console.log('Telegram bot is ready!')
+})
+```
+
+## Session Management
+
+### Session Files Location
+
+```
+{name}_sessions/session.txt
+```
+
+### Extract Session String
+
+After first successful login:
+
+```typescript
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+const sessionPath = join(process.cwd(), 'telegram-bot_sessions', 'session.txt')
+const sessionString = readFileSync(sessionPath, 'utf-8')
+console.log('Session string:', sessionString)
+// Save this to environment variable for reuse
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Authentication">
+    - Store API credentials securely (environment variables)
+    - Save session string after first login
+    - Implement proper code retrieval mechanism
+    - Use 2FA for additional security
+  </Accordion>
+
+  <Accordion title="Media Handling">
+    - Use public URLs for media when possible
+    - Clean up temporary files after sending
+    - Validate file sizes before sending
+    - Use appropriate file formats
+  </Accordion>
+
+  <Accordion title="Message Management">
+    - Mark messages as read to maintain conversation state
+    - Handle unread messages on bot startup
+    - Implement proper error handling for failed sends
+  </Accordion>
+
+  <Accordion title="Session Security">
+    - Never commit session files to version control
+    - Rotate sessions periodically
+    - Monitor for unauthorized access
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication Failed">
+    - Verify API ID and API Hash are correct
+    - Check phone number format (include country code)
+    - Ensure verification code is entered within timeout
+    - Clear session files and try again
+  </Accordion>
+
+  <Accordion title="Session Errors">
+    - Delete `{name}_sessions` directory
+    - Re-authenticate with phone number
+    - Check for session file corruption
+  </Accordion>
+
+  <Accordion title="Media Not Sending">
+    - Verify file exists and is accessible
+    - Check file format is supported
+    - Ensure file isn't too large
+    - Review Telegram media upload limits
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Bot
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot/provider-telegram'
+import { MemoryDB } from '@builderbot/bot'
+import readline from 'readline'
+
+// Helper to get code from console
+const getCodeFromConsole = (): Promise<string> => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+  
+  return new Promise((resolve) => {
+    rl.question('Enter verification code: ', (code) => {
+      rl.close()
+      resolve(code)
+    })
+  })
+}
+
+const welcomeFlow = addKeyword(['/start', 'hi'])
+  .addAnswer('👋 Hello! Welcome to our Telegram bot')
+  .addAnswer('How can I help you?')
+
+const mediaFlow = addKeyword('/media')
+  .addAnswer('I\'ll send you some files...')
+  .addAnswer('Image:', { media: 'https://example.com/image.jpg' })
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow, mediaFlow])
+  
+  const adapterProvider = createProvider(TelegramProvider, {
+    apiId: parseInt(process.env.TELEGRAM_API_ID),
+    apiHash: process.env.TELEGRAM_API_HASH,
+    apiNumber: process.env.TELEGRAM_PHONE_NUMBER,
+    apiPassword: process.env.TELEGRAM_PASSWORD,
+    getCode: getCodeFromConsole,
+    telegramJwt: process.env.TELEGRAM_SESSION // Optional: use saved session
+  })
+  
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(3000)
+}
+
+main()
+```
+
+## Further Resources
+
+- [Telegram Bot API](https://core.telegram.org/bots/api)
+- [Telegram MTProto](https://core.telegram.org/mtproto)
+- [Get API Credentials](https://my.telegram.org/auth?to=apps)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

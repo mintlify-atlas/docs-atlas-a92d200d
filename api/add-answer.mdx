@@ -1,0 +1,401 @@
+---
+title: 'addAnswer'
+description: 'Add a response message to a conversation flow with optional actions and nested flows'
+---
+
+## Overview
+
+The `addAnswer` method adds a response message to a conversation flow. It can include media, buttons, capture user input, execute callbacks, and nest additional flows.
+
+## Method Signature
+
+<CodeGroup>
+```typescript TypeScript
+addAnswer(
+  answer: string | string[],
+  options?: ActionPropertiesKeyword | null,
+  cb?: CallbackFunction<P, B> | null,
+  nested?: TFlow<P, B> | TFlow<P, B>[] | null
+): TFlow<P, B>
+```
+
+```javascript JavaScript
+addAnswer(answer, options, cb, nested)
+```
+</CodeGroup>
+
+## Parameters
+
+<ParamField path="answer" type="string | string[]" required>
+  The message text to send. Can be:
+  - A single string: `'Hello!'`
+  - An array of strings (joined with newlines): `['Hello!', 'How are you?']`
+</ParamField>
+
+<ParamField path="options" type="ActionPropertiesKeyword">
+  Configuration options for the message.
+  
+  <Expandable title="properties">
+    <ParamField path="media" type="string">
+      URL or path to media file (image, video, audio, or document).
+    </ParamField>
+    
+    <ParamField path="buttons" type="Button[]">
+      Array of button objects. Each button has a `body` property with the button text.
+    </ParamField>
+    
+    <ParamField path="capture" type="boolean" default="false">
+      When `true`, captures the user's next response and passes it to the callback function.
+    </ParamField>
+    
+    <ParamField path="delay" type="number" default="0">
+      Delay in milliseconds before sending this message.
+    </ParamField>
+    
+    <ParamField path="idle" type="number" deprecated>
+      Deprecated. Time in milliseconds for idle timeout.
+    </ParamField>
+    
+    <ParamField path="ref" type="string">
+      Custom reference ID for this answer (for internal use).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="cb" type="CallbackFunction<P, B>">
+  Callback function executed when this answer is triggered. Receives context and bot methods.
+  
+  <Expandable title="callback parameters">
+    <ParamField path="ctx" type="BotContext">
+      Message context containing:
+      - `body`: User's message text
+      - `from`: User's phone number/ID
+      - `name`: User's name (if available)
+      - Additional provider-specific data
+    </ParamField>
+    
+    <ParamField path="methods" type="BotMethods">
+      Bot control methods:
+      - `flowDynamic`: Send dynamic messages
+      - `gotoFlow`: Navigate to another flow
+      - `endFlow`: End the current conversation
+      - `fallBack`: Go back to previous step
+      - `state`: Manage user-specific state
+      - `globalState`: Manage global bot state
+      - `provider`: Access provider instance
+      - `database`: Access database instance
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="nested" type="TFlow | TFlow[]">
+  Child flow(s) to execute after this answer. Can be a single flow or array of flows.
+</ParamField>
+
+## Return Value
+
+<ResponseField name="flow" type="TFlow<P, B>">
+  Returns the flow object, allowing for method chaining with additional `addAnswer()` or `addAction()` calls.
+</ResponseField>
+
+## Usage Examples
+
+### Simple Text Response
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    const flow = addKeyword('hello')
+      .addAnswer('Hi! Welcome to our service.')
+      .addAnswer('How can I help you today?')
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    const flow = addKeyword('hello')
+      .addAnswer('Hi! Welcome to our service.')
+      .addAnswer('How can I help you today?')
+    ```
+  </Tab>
+</Tabs>
+
+### Multi-line Message
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const flow = addKeyword('info')
+      .addAnswer([
+        'Company Information:',
+        'Name: BuilderBot Inc.',
+        'Email: info@builderbot.app',
+        'Hours: Mon-Fri 9AM-5PM'
+      ])
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const flow = addKeyword('info')
+      .addAnswer([
+        'Company Information:',
+        'Name: BuilderBot Inc.',
+        'Email: info@builderbot.app',
+        'Hours: Mon-Fri 9AM-5PM'
+      ])
+    ```
+  </Tab>
+</Tabs>
+
+### With Media
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const flow = addKeyword('catalog')
+      .addAnswer(
+        'Here is our product catalog:',
+        { media: 'https://example.com/catalog.pdf' }
+      )
+      .addAnswer(
+        'Check out this product!',
+        { media: './assets/product-image.jpg' }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const flow = addKeyword('catalog')
+      .addAnswer(
+        'Here is our product catalog:',
+        { media: 'https://example.com/catalog.pdf' }
+      )
+      .addAnswer(
+        'Check out this product!',
+        { media: './assets/product-image.jpg' }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### With Buttons
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const flow = addKeyword('menu')
+      .addAnswer(
+        'Please select an option:',
+        {
+          buttons: [
+            { body: 'View Products' },
+            { body: 'Check Order' },
+            { body: 'Contact Support' }
+          ]
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const flow = addKeyword('menu')
+      .addAnswer(
+        'Please select an option:',
+        {
+          buttons: [
+            { body: 'View Products' },
+            { body: 'Check Order' },
+            { body: 'Contact Support' }
+          ]
+        }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### Capturing User Input
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const flow = addKeyword('register')
+      .addAnswer(
+        'What is your name?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          await state.update({ name: ctx.body })
+          await flowDynamic(`Nice to meet you, ${ctx.body}!`)
+        }
+      )
+      .addAnswer(
+        'What is your email?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          const name = state.get('name')
+          await state.update({ email: ctx.body })
+          await flowDynamic(`Thanks ${name}, we'll contact you at ${ctx.body}`)
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const flow = addKeyword('register')
+      .addAnswer(
+        'What is your name?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          await state.update({ name: ctx.body })
+          await flowDynamic(`Nice to meet you, ${ctx.body}!`)
+        }
+      )
+      .addAnswer(
+        'What is your email?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          const name = state.get('name')
+          await state.update({ email: ctx.body })
+          await flowDynamic(`Thanks ${name}, we'll contact you at ${ctx.body}`)
+        }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### With Delay
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const flow = addKeyword('order')
+      .addAnswer('Processing your order...')
+      .addAnswer(
+        'Order confirmed!',
+        { delay: 2000 } // Wait 2 seconds before sending
+      )
+      .addAnswer(
+        'You will receive a confirmation email shortly.',
+        { delay: 1000 }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const flow = addKeyword('order')
+      .addAnswer('Processing your order...')
+      .addAnswer(
+        'Order confirmed!',
+        { delay: 2000 } // Wait 2 seconds before sending
+      )
+      .addAnswer(
+        'You will receive a confirmation email shortly.',
+        { delay: 1000 }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### With Nested Flows
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const productsFlow = addKeyword('products')
+      .addAnswer('Here are our products...')
+
+    const ordersFlow = addKeyword('orders')
+      .addAnswer('Here are your orders...')
+
+    const menuFlow = addKeyword('menu')
+      .addAnswer(
+        'Select an option:',
+        { capture: true },
+        async (ctx, { gotoFlow }) => {
+          if (ctx.body === '1') await gotoFlow(productsFlow)
+          if (ctx.body === '2') await gotoFlow(ordersFlow)
+        },
+        [productsFlow, ordersFlow] // Nested flows
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const productsFlow = addKeyword('products')
+      .addAnswer('Here are our products...')
+
+    const ordersFlow = addKeyword('orders')
+      .addAnswer('Here are your orders...')
+
+    const menuFlow = addKeyword('menu')
+      .addAnswer(
+        'Select an option:',
+        { capture: true },
+        async (ctx, { gotoFlow }) => {
+          if (ctx.body === '1') await gotoFlow(productsFlow)
+          if (ctx.body === '2') await gotoFlow(ordersFlow)
+        },
+        [productsFlow, ordersFlow] // Nested flows
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### API Integration
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const weatherFlow = addKeyword('weather')
+      .addAnswer(
+        'Which city?',
+        { capture: true },
+        async (ctx, { flowDynamic }) => {
+          const city = ctx.body
+          const response = await fetch(`https://api.weather.com/v1/${city}`)
+          const data = await response.json()
+          await flowDynamic(`Weather in ${city}: ${data.temp}°C, ${data.condition}`)
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const weatherFlow = addKeyword('weather')
+      .addAnswer(
+        'Which city?',
+        { capture: true },
+        async (ctx, { flowDynamic }) => {
+          const city = ctx.body
+          const response = await fetch(`https://api.weather.com/v1/${city}`)
+          const data = await response.json()
+          await flowDynamic(`Weather in ${city}: ${data.temp}°C, ${data.condition}`)
+        }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+## Notes
+
+- String arrays are automatically joined with newlines (`\n`)
+- When `capture: true`, the callback receives the user's next message
+- Delays are cumulative with the global bot delay setting
+- Media URLs can be HTTP/HTTPS links or local file paths
+- Buttons availability depends on the provider (not all platforms support buttons)
+- Callbacks are async-compatible - use `async/await` for asynchronous operations
+
+## Related
+
+- [addKeyword](/api/add-keyword) - Create the initial flow
+- [addAction](/api/add-action) - Execute callbacks without sending messages

@@ -1,0 +1,469 @@
+---
+title: Database Adapters
+description: Understanding database adapters and data persistence in BuilderBot
+---
+
+## What is a Database Adapter?
+
+A **database adapter** in BuilderBot manages conversation history and user data persistence. It provides a unified interface for storing and retrieving conversation context, regardless of the underlying storage mechanism.
+
+## Base Class: MemoryDB
+
+All database adapters extend the `MemoryDB` class, which provides the core interface:
+
+```typescript
+class MemoryDB {
+  public listHistory: any[] = []
+
+  async getPrevByNumber(from: string): Promise<any> {
+    const history = this.listHistory
+      .slice()
+      .reverse()
+      .filter((i) => !!i.keyword)
+    return history.find((a) => a.from === from)
+  }
+
+  async save(ctx: any): Promise<void> {
+    this.listHistory.push(ctx)
+  }
+}
+```
+
+**Core Methods:**
+- `getPrevByNumber(from)` - Retrieve the last conversation state for a user
+- `save(ctx)` - Persist conversation context
+
+## Available Adapters
+
+BuilderBot provides several database adapters out of the box:
+
+<Tabs>
+  <Tab title="Memory (In-Memory)">
+    ```typescript
+    import { MemoryDB } from '@builderbot/bot'
+    
+    const database = new MemoryDB()
+    ```
+    
+    **Use Case:** Development, testing, or bots that don't require persistence.
+    
+    **Pros:**
+    - Zero configuration
+    - Fastest performance
+    - No external dependencies
+    
+    **Cons:**
+    - Data lost on restart
+    - Limited by RAM
+    - Not suitable for production
+  </Tab>
+  
+  <Tab title="JSON File">
+    ```typescript
+    import { JsonFileDB } from '@builderbot/database-json'
+    
+    const database = new JsonFileDB({
+      filename: 'db.json',
+      debounceTime: 1000 // Optional: batch writes
+    })
+    ```
+    
+    **Use Case:** Small bots, development, simple deployments.
+    
+    **Pros:**
+    - Simple file-based storage
+    - Human-readable format
+    - No external database required
+    - Atomic writes with temp files
+    
+    **Cons:**
+    - Not suitable for high traffic
+    - File locking issues in distributed systems
+  </Tab>
+  
+  <Tab title="PostgreSQL">
+    ```typescript
+    import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+    
+    const database = new PostgreSQLAdapter({
+      host: 'localhost',
+      user: 'postgres',
+      database: 'bot_db',
+      password: 'password',
+      port: 5432
+    })
+    ```
+    
+    **Use Case:** Production environments, scalable deployments.
+    
+    **Pros:**
+    - ACID compliance
+    - Excellent for concurrent access
+    - Advanced querying
+    - Reliable and battle-tested
+    
+    **Features:**
+    - Auto-creates tables and stored procedures
+    - Contact management
+    - JSON field support
+  </Tab>
+  
+  <Tab title="MySQL">
+    ```typescript
+    import { MysqlAdapter } from '@builderbot/database-mysql'
+    
+    const database = new MysqlAdapter({
+      host: 'localhost',
+      user: 'root',
+      database: 'bot_db',
+      password: 'password',
+      port: 3306
+    })
+    ```
+    
+    **Use Case:** Production environments with MySQL infrastructure.
+    
+    **Pros:**
+    - Wide hosting support
+    - Good performance
+    - Mature ecosystem
+    
+    **Features:**
+    - Auto-creates history table
+    - UTF-8 support
+    - JSON field storage
+  </Tab>
+  
+  <Tab title="MongoDB">
+    ```typescript
+    import { MongoAdapter } from '@builderbot/database-mongo'
+    
+    const database = new MongoAdapter(
+      'mongodb://localhost:27017/bot_db'
+    )
+    ```
+    
+    **Use Case:** Document-oriented storage, flexible schemas.
+    
+    **Pros:**
+    - Flexible schema
+    - Horizontal scaling
+    - Native JSON support
+  </Tab>
+</Tabs>
+
+## Database Schema
+
+### History Table
+
+Conversation history is stored with this structure:
+
+**PostgreSQL Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS history (
+  id SERIAL PRIMARY KEY,
+  ref VARCHAR(255) DEFAULT NULL,
+  keyword VARCHAR(255) NULL,
+  answer TEXT NULL,
+  refSerialize VARCHAR(255) NULL,
+  phone VARCHAR(255) NOT NULL,
+  options TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+**MySQL Schema:**
+```sql
+CREATE TABLE history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ref varchar(255) DEFAULT NULL,
+  keyword varchar(255) NULL,
+  answer longtext NULL,
+  refSerialize varchar(255) NULL,
+  phone varchar(255) NOT NULL,
+  options longtext NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_General_ci
+```
+
+**Fields:**
+- `ref` - Flow reference ID
+- `keyword` - Trigger keyword
+- `answer` - Bot response
+- `refSerialize` - Serialized flow reference
+- `phone` - User identifier (phone number)
+- `options` - JSON-encoded flow options
+- `created_at` - Timestamp
+
+### Contact Table
+
+Some adapters also store contact information:
+
+**PostgreSQL Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS contact (
+  id SERIAL PRIMARY KEY,
+  phone VARCHAR(255) DEFAULT NULL,
+  values TEXT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+**Fields:**
+- `phone` - User phone number
+- `values` - JSON-encoded user data
+- `created_at` - Timestamp
+
+## Using Database Adapters
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+const main = async () => {
+  const adapterDB = new PostgreSQLAdapter({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: 5432
+  })
+
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterFlow = createFlow([/* your flows */])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+
+## History Management
+
+### Retrieving Previous Context
+
+The database automatically tracks the last interaction:
+
+```typescript
+const prevContext = await database.getPrevByNumber('1234567890')
+
+if (prevContext) {
+  console.log('Last keyword:', prevContext.keyword)
+  console.log('Last answer:', prevContext.answer)
+  console.log('Flow ref:', prevContext.refSerialize)
+}
+```
+
+### Saving Context
+
+Context is automatically saved by BuilderBot, but you can manually save:
+
+```typescript
+await database.save({
+  ref: 'ans_abc123',
+  keyword: 'welcome',
+  answer: 'Welcome to our bot!',
+  refSerialize: 'key_xyz789',
+  from: '1234567890',
+  options: { capture: false, delay: 0 }
+})
+```
+
+## Contact Management
+
+PostgreSQL and MySQL adapters support contact data:
+
+### Save Contact Data
+
+```typescript
+await database.saveContact({
+  from: '1234567890',
+  values: {
+    name: 'John Doe',
+    email: 'john@example.com',
+    preferences: { language: 'en', notifications: true }
+  },
+  action: 'a' // 'a' = append (merge), 'u' = update (replace)
+})
+```
+
+**Actions:**
+- `'a'` (append) - Merge new values with existing data
+- `'u'` (update) - Replace all values
+
+### Retrieve Contact Data
+
+```typescript
+const contact = await database.getContact({ from: '1234567890' })
+
+if (contact) {
+  console.log('Name:', contact.values.name)
+  console.log('Email:', contact.values.email)
+}
+```
+
+## JSON File Adapter Features
+
+The JSON adapter includes advanced features for reliability:
+
+### Atomic Writes
+
+```typescript
+private async atomicWrite(): Promise<void> {
+  const parseData = JSON.stringify(this.listHistory, null, 2)
+  // Write to temp file first
+  await fsPromises.writeFile(this.tempPath, parseData, 'utf-8')
+  // Atomic rename
+  await fsPromises.rename(this.tempPath, this.pathFile)
+}
+```
+
+This prevents corruption if the process crashes during write.
+
+### Debounced Writes
+
+```typescript
+const database = new JsonFileDB({
+  filename: 'db.json',
+  debounceTime: 2000 // Wait 2s before writing
+})
+```
+
+Batches multiple saves to reduce I/O operations.
+
+### Initialization and Recovery
+
+```typescript
+// Automatically handles:
+// - Missing files (creates new)
+// - Corrupt JSON (starts fresh)
+// - Leftover temp files (cleanup)
+private async init(): Promise<void> {
+  if (existsSync(this.tempPath)) {
+    await fsPromises.unlink(this.tempPath) // Cleanup
+  }
+  
+  if (!existsSync(this.pathFile)) {
+    await fsPromises.writeFile(this.pathFile, '[]', 'utf-8')
+  } else {
+    const data = await fsPromises.readFile(this.pathFile, 'utf-8')
+    this.listHistory = this.validateJson(data)
+  }
+}
+```
+
+## PostgreSQL Stored Procedures
+
+The PostgreSQL adapter uses stored procedures for atomic operations:
+
+```sql
+CREATE OR REPLACE FUNCTION save_or_update_history_and_contact(
+  p_ref VARCHAR,
+  p_keyword VARCHAR,
+  p_answer TEXT,
+  p_refSerialize VARCHAR,
+  p_phone VARCHAR,
+  p_options TEXT
+) RETURNS VOID AS $$
+BEGIN
+  -- Insert history
+  INSERT INTO history (ref, keyword, answer, refSerialize, phone, options)
+  VALUES (p_ref, p_keyword, p_answer, p_refSerialize, p_phone, p_options);
+  
+  -- Upsert contact
+  INSERT INTO contact (phone, values)
+  VALUES (p_phone, '{}'::jsonb)
+  ON CONFLICT (phone) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+## Best Practices
+
+<Tip>
+  **Development vs Production**: Use `MemoryDB` for development and testing, switch to PostgreSQL/MySQL for production.
+</Tip>
+
+<Warning>
+  **Connection Pooling**: For high-traffic bots, configure connection pooling in your database adapter to prevent connection exhaustion.
+</Warning>
+
+<Note>
+  **Data Migration**: When switching adapters, there's no automatic migration. Export data from one adapter and import to another if needed.
+</Note>
+
+<Tip>
+  **Environment Variables**: Always use environment variables for database credentials:
+  ```typescript
+  const database = new PostgreSQLAdapter({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: parseInt(process.env.DB_PORT || '5432')
+  })
+  ```
+</Tip>
+
+## Custom Adapters
+
+Create custom adapters by extending `MemoryDB`:
+
+```typescript
+import { MemoryDB } from '@builderbot/bot'
+
+class RedisAdapter extends MemoryDB {
+  private redis: RedisClient
+
+  constructor(redisUrl: string) {
+    super()
+    this.redis = createRedisClient(redisUrl)
+  }
+
+  async getPrevByNumber(from: string): Promise<any> {
+    const data = await this.redis.get(`history:${from}`)
+    return data ? JSON.parse(data) : undefined
+  }
+
+  async save(ctx: any): Promise<void> {
+    await this.redis.set(
+      `history:${ctx.from}`,
+      JSON.stringify(ctx),
+      'EX',
+      86400 // 24h expiry
+    )
+    this.listHistory.push(ctx)
+  }
+}
+```
+
+## Error Handling
+
+All adapters include error handling:
+
+```typescript
+async save(ctx: HistoryEntry): Promise<void> {
+  try {
+    await this.db.query(query, values)
+  } catch (error) {
+    console.error('Error saving history:', error)
+    throw error
+  }
+  this.listHistory.push(ctx)
+}
+```
+
+Always wrap database operations in try-catch blocks in production code.
+
+## Related Concepts
+
+- [Providers](/concepts/providers) - Connect messaging platforms
+- [State Management](/concepts/state-management) - Manage conversation state
+- [Flows](/concepts/flows) - Understand flow serialization

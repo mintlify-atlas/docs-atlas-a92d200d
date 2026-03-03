@@ -1,0 +1,384 @@
+---
+title: MongoDB Adapter
+description: Use MongoDB for scalable, flexible conversation storage
+---
+
+The MongoDB adapter provides a production-ready NoSQL database solution for BuilderBot. Perfect for applications that need horizontal scaling, flexible schemas, and cloud deployment.
+
+## Installation
+
+```bash
+npm install @builderbot/database-mongo
+```
+
+The adapter uses the official MongoDB Node.js driver (`mongodb` v7.0+), which is included as a dependency.
+
+## Basic Usage
+
+```typescript
+import { createBot, createFlow, createProvider } from '@builderbot/bot'
+import { MongoAdapter as Database } from '@builderbot/database-mongo'
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterDB = new Database({
+    dbUri: process.env.MONGO_DB_URI,
+    dbName: process.env.MONGO_DB_NAME
+  })
+  
+  await createBot({
+    flow: createFlow([]),
+    provider: createProvider(Provider),
+    database: adapterDB
+  })
+}
+
+main()
+```
+
+## Configuration
+
+<ParamField path="dbUri" type="string" required>
+  MongoDB connection string. Supports standard MongoDB URIs.
+  
+  **Examples**:
+  - Local: `mongodb://localhost:27017`
+  - MongoDB Atlas: `mongodb+srv://<username>:<password>@cluster.mongodb.net`
+  - Replica Set: `mongodb://host1:27017,host2:27017/db?replicaSet=rs0`
+</ParamField>
+
+<ParamField path="dbName" type="string" required>
+  Name of the database to use for storing conversation history.
+</ParamField>
+
+## Connection Examples
+
+<CodeGroup>
+```typescript Local MongoDB
+import { MongoAdapter } from '@builderbot/database-mongo'
+
+const adapterDB = new MongoAdapter({
+  dbUri: 'mongodb://localhost:27017',
+  dbName: 'builderbot'
+})
+```
+
+```typescript MongoDB Atlas
+import { MongoAdapter } from '@builderbot/database-mongo'
+
+const adapterDB = new MongoAdapter({
+  dbUri: 'mongodb+srv://username:password@cluster0.mongodb.net',
+  dbName: 'builderbot_prod'
+})
+```
+
+```typescript With Authentication
+import { MongoAdapter } from '@builderbot/database-mongo'
+
+const adapterDB = new MongoAdapter({
+  dbUri: 'mongodb://admin:password@localhost:27017/admin',
+  dbName: 'builderbot'
+})
+```
+
+```typescript Environment Variables
+import { MongoAdapter } from '@builderbot/database-mongo'
+
+const adapterDB = new MongoAdapter({
+  dbUri: process.env.MONGO_DB_URI,
+  dbName: process.env.MONGO_DB_NAME
+})
+```
+</CodeGroup>
+
+## Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash .env
+MONGO_DB_URI=mongodb+srv://username:password@cluster.mongodb.net
+MONGO_DB_NAME=builderbot_production
+```
+
+Then load it in your application:
+
+```typescript
+import 'dotenv/config'
+import { MongoAdapter } from '@builderbot/database-mongo'
+
+const adapterDB = new MongoAdapter({
+  dbUri: process.env.MONGO_DB_URI,
+  dbName: process.env.MONGO_DB_NAME
+})
+```
+
+## Database Schema
+
+The adapter uses a single `history` collection:
+
+```typescript
+interface History {
+  from: string        // Phone number or user identifier
+  body: any          // Message content
+  keyword: string[]  // Trigger keywords
+  _id?: ObjectId     // MongoDB document ID
+  date?: Date        // Timestamp (auto-added)
+}
+```
+
+### Example Document
+
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439011"),
+  "from": "1234567890",
+  "body": "Hello",
+  "keyword": ["hello", "hi"],
+  "date": ISODate("2024-03-15T10:30:00Z")
+}
+```
+
+## Implementation Details
+
+The adapter automatically:
+- Connects to MongoDB on initialization
+- Creates the `history` collection if it doesn't exist
+- Adds timestamps to all saved entries
+- Handles connection errors gracefully
+
+```typescript packages/database-mongo/src/mongoAdapter.ts
+class MongoAdapter extends MemoryDB {
+  async init(): Promise<boolean> {
+    const client = new MongoClient(this.credentials.dbUri)
+    await client.connect()
+    console.log('🆗 Connection successfully established')
+    this.db = client.db(this.credentials.dbName)
+    return true
+  }
+
+  async save(ctx: History): Promise<void> {
+    const ctxWithDate = {
+      ...ctx,
+      date: new Date()
+    }
+    await this.db.collection('history').insertOne(ctxWithDate)
+  }
+
+  async getPrevByNumber(from: string): Promise<any> {
+    const result = await this.db
+      .collection('history')
+      .find({ from })
+      .sort({ _id: -1 })
+      .limit(1)
+      .toArray()
+    return result[0]
+  }
+}
+```
+
+## MongoDB Atlas Setup
+
+### 1. Create a Free Cluster
+
+1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+2. Sign up or log in
+3. Create a new project
+4. Click "Build a Database"
+5. Choose the **FREE** shared tier (M0)
+6. Select a cloud provider and region
+7. Click "Create Cluster"
+
+### 2. Configure Database Access
+
+1. Navigate to "Database Access" in the left sidebar
+2. Click "Add New Database User"
+3. Choose authentication method (Username/Password)
+4. Set username and password
+5. Grant "Read and write to any database" role
+6. Click "Add User"
+
+### 3. Configure Network Access
+
+1. Navigate to "Network Access"
+2. Click "Add IP Address"
+3. For development: Click "Allow Access from Anywhere" (0.0.0.0/0)
+4. For production: Add your server's specific IP address
+5. Click "Confirm"
+
+### 4. Get Connection String
+
+1. Go to "Database" and click "Connect" on your cluster
+2. Choose "Connect your application"
+3. Select "Node.js" driver and version "4.1 or later"
+4. Copy the connection string
+5. Replace `<password>` with your database user password
+6. Replace `<dbname>` with your database name (or set it in config)
+
+```
+mongodb+srv://username:<password>@cluster0.xxxxx.mongodb.net/
+```
+
+## Indexes for Performance
+
+Add indexes to improve query performance:
+
+```javascript
+// In MongoDB shell or Compass
+db.history.createIndex({ from: 1 })  // Index on phone numbers
+db.history.createIndex({ date: -1 }) // Index on date (newest first)
+db.history.createIndex({ keyword: 1 }) // Index on keywords
+```
+
+Or programmatically:
+
+```typescript
+import { MongoAdapter } from '@builderbot/database-mongo'
+
+const adapterDB = new MongoAdapter({
+  dbUri: process.env.MONGO_DB_URI,
+  dbName: process.env.MONGO_DB_NAME
+})
+
+// Wait for connection
+setTimeout(async () => {
+  await adapterDB.db.collection('history').createIndex({ from: 1 })
+  await adapterDB.db.collection('history').createIndex({ date: -1 })
+  console.log('Indexes created')
+}, 3000)
+```
+
+## TypeScript Support
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+import { MongoAdapter } from '@builderbot/database-mongo'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const welcomeFlow = addKeyword<BaileysProvider, MongoAdapter>(['hello'])
+  .addAnswer('Hi! How can I help you?')
+```
+
+## Connection Pooling
+
+The MongoDB driver automatically manages connection pooling. For high-traffic applications, you can tune the pool size:
+
+```typescript
+import { MongoClient } from 'mongodb'
+
+const client = new MongoClient(uri, {
+  maxPoolSize: 50,    // Maximum connections
+  minPoolSize: 10,    // Minimum connections
+  maxIdleTimeMS: 60000 // Close idle connections after 60s
+})
+```
+
+<Note>
+  The current adapter implementation doesn't expose these options. For custom pool settings, you may need to modify the adapter or create a custom connection.
+</Note>
+
+## Error Handling
+
+The adapter logs connection errors but doesn't throw:
+
+```typescript packages/database-mongo/src/mongoAdapter.ts
+async init(): Promise<boolean> {
+  try {
+    const client = new MongoClient(this.credentials.dbUri)
+    await client.connect()
+    console.log('🆗 Connection successfully established')
+    this.db = client.db(this.credentials.dbName)
+    return true
+  } catch (e) {
+    console.log('Error', e)
+    return
+  }
+}
+```
+
+Implement your own error handling:
+
+```typescript
+const adapterDB = new MongoAdapter({
+  dbUri: process.env.MONGO_DB_URI,
+  dbName: process.env.MONGO_DB_NAME
+})
+
+// Wait and check connection
+setTimeout(() => {
+  if (!adapterDB.db) {
+    console.error('Failed to connect to MongoDB')
+    process.exit(1)
+  }
+}, 5000)
+```
+
+## Backup and Restore
+
+### Using mongodump/mongorestore
+
+```bash
+# Backup
+mongodump --uri="mongodb+srv://user:pass@cluster.mongodb.net/builderbot" --out=./backup
+
+# Restore
+mongorestore --uri="mongodb+srv://user:pass@cluster.mongodb.net/builderbot" ./backup/builderbot
+```
+
+### MongoDB Atlas Automated Backups
+
+MongoDB Atlas provides automated backups for M10+ clusters (paid tiers).
+
+## Monitoring
+
+Monitor your database using:
+- **MongoDB Atlas Dashboard**: Real-time metrics and alerts
+- **MongoDB Compass**: GUI for exploring data
+- **Application logs**: Connection status and errors
+
+## Best Practices
+
+<Check>Use environment variables for credentials</Check>
+<Check>Enable authentication in production</Check>
+<Check>Restrict network access to specific IPs</Check>
+<Check>Create indexes on frequently queried fields</Check>
+<Check>Monitor connection pool usage</Check>
+<Check>Set up automated backups</Check>
+
+## Troubleshooting
+
+### Connection Timeout
+
+```
+Error: connect ETIMEDOUT
+```
+
+**Solutions**:
+- Check network access whitelist in MongoDB Atlas
+- Verify firewall settings
+- Ensure correct connection string
+
+### Authentication Failed
+
+```
+Error: Authentication failed
+```
+
+**Solutions**:
+- Verify username and password
+- Check user permissions
+- Ensure password doesn't contain special characters (or URL encode them)
+
+### Database Not Found
+
+MongoDB creates databases automatically when you first write data. No manual creation needed.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="key" href="/deployment/environment">
+    Secure your database credentials
+  </Card>
+  <Card title="Scaling" icon="chart-line" href="/deployment/scaling">
+    Scale your bot with MongoDB
+  </Card>
+</CardGroup>

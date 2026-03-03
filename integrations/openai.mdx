@@ -1,0 +1,662 @@
+---
+title: 'OpenAI Integration'
+description: 'Integrate OpenAI ChatGPT API with BuilderBot for intelligent conversational AI'
+icon: 'robot'
+---
+
+# OpenAI / ChatGPT Integration
+
+Integrate OpenAI's ChatGPT API with BuilderBot to create intelligent, context-aware conversational experiences powered by GPT-4, GPT-3.5, or other OpenAI models.
+
+## Installation
+
+<Steps>
+  <Step title="Install OpenAI SDK">
+    Install the official OpenAI Node.js library:
+
+    <CodeGroup>
+    ```bash npm
+    npm install openai
+    ```
+
+    ```bash pnpm
+    pnpm add openai
+    ```
+
+    ```bash yarn
+    yarn add openai
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Get API Key">
+    1. Go to [OpenAI Platform](https://platform.openai.com/)
+    2. Sign up or log in to your account
+    3. Navigate to API Keys section
+    4. Create a new API key
+    5. Copy and save it securely
+  </Step>
+
+  <Step title="Set Environment Variable">
+    Create a `.env` file in your project root:
+
+    ```bash .env
+    OPENAI_API_KEY=sk-proj-...
+    ```
+
+    Install dotenv if needed:
+    ```bash
+    npm install dotenv
+    ```
+  </Step>
+</Steps>
+
+## Basic Setup
+
+### Configure OpenAI Client
+
+<CodeGroup>
+```javascript openai-client.js
+const OpenAI = require('openai')
+require('dotenv').config()
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+module.exports = { openai }
+```
+
+```typescript openai-client.ts
+import OpenAI from 'openai'
+import 'dotenv/config'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+export { openai }
+```
+</CodeGroup>
+
+### Create Chat Service
+
+Build a service to manage conversations with ChatGPT:
+
+<CodeGroup>
+```javascript chat-service.js
+const { openai } = require('./openai-client')
+
+class ChatGPTService {
+  constructor(model = 'gpt-3.5-turbo') {
+    this.model = model
+    this.conversations = new Map() // Store conversation history per user
+  }
+
+  async chat(userId, message, systemPrompt = 'You are a helpful assistant.') {
+    // Get or initialize conversation history
+    if (!this.conversations.has(userId)) {
+      this.conversations.set(userId, [
+        { role: 'system', content: systemPrompt }
+      ])
+    }
+
+    const conversation = this.conversations.get(userId)
+    
+    // Add user message to history
+    conversation.push({ role: 'user', content: message })
+
+    try {
+      // Call OpenAI API
+      const response = await openai.chat.completions.create({
+        model: this.model,
+        messages: conversation,
+        temperature: 0.7,
+        max_tokens: 500,
+      })
+
+      const assistantMessage = response.choices[0].message.content
+      
+      // Add assistant response to history
+      conversation.push({ role: 'assistant', content: assistantMessage })
+      
+      // Keep conversation history manageable (last 10 messages)
+      if (conversation.length > 21) {
+        conversation.splice(1, 2) // Keep system message, remove oldest pair
+      }
+
+      return assistantMessage
+    } catch (error) {
+      console.error('OpenAI API Error:', error)
+      throw error
+    }
+  }
+
+  clearConversation(userId) {
+    this.conversations.delete(userId)
+  }
+
+  resetConversation(userId, systemPrompt) {
+    this.conversations.set(userId, [
+      { role: 'system', content: systemPrompt }
+    ])
+  }
+}
+
+module.exports = { ChatGPTService }
+```
+
+```typescript chat-service.ts
+import { openai } from './openai-client'
+import type { ChatCompletionMessageParam } from 'openai/resources/chat'
+
+export class ChatGPTService {
+  private model: string
+  private conversations: Map<string, ChatCompletionMessageParam[]>
+
+  constructor(model: string = 'gpt-3.5-turbo') {
+    this.model = model
+    this.conversations = new Map()
+  }
+
+  async chat(
+    userId: string, 
+    message: string, 
+    systemPrompt: string = 'You are a helpful assistant.'
+  ): Promise<string> {
+    // Get or initialize conversation history
+    if (!this.conversations.has(userId)) {
+      this.conversations.set(userId, [
+        { role: 'system', content: systemPrompt }
+      ])
+    }
+
+    const conversation = this.conversations.get(userId)!
+    
+    // Add user message to history
+    conversation.push({ role: 'user', content: message })
+
+    try {
+      // Call OpenAI API
+      const response = await openai.chat.completions.create({
+        model: this.model,
+        messages: conversation,
+        temperature: 0.7,
+        max_tokens: 500,
+      })
+
+      const assistantMessage = response.choices[0].message.content || ''
+      
+      // Add assistant response to history
+      conversation.push({ role: 'assistant', content: assistantMessage })
+      
+      // Keep conversation history manageable (last 10 messages)
+      if (conversation.length > 21) {
+        conversation.splice(1, 2) // Keep system message, remove oldest pair
+      }
+
+      return assistantMessage
+    } catch (error) {
+      console.error('OpenAI API Error:', error)
+      throw error
+    }
+  }
+
+  clearConversation(userId: string): void {
+    this.conversations.delete(userId)
+  }
+
+  resetConversation(userId: string, systemPrompt: string): void {
+    this.conversations.set(userId, [
+      { role: 'system', content: systemPrompt }
+    ])
+  }
+}
+```
+</CodeGroup>
+
+## Integration with BuilderBot
+
+### Complete Bot Example
+
+<CodeGroup>
+```javascript app.js
+const { createBot, createProvider, createFlow, addKeyword } = require('@builderbot/bot')
+const { MemoryDB } = require('@builderbot/bot')
+const { BaileysProvider } = require('@builderbot/provider-baileys')
+const { ChatGPTService } = require('./chat-service')
+require('dotenv').config()
+
+const main = async () => {
+  const adapterDB = new MemoryDB()
+  const adapterProvider = createProvider(BaileysProvider)
+
+  // Initialize ChatGPT service
+  const chatGPT = new ChatGPTService('gpt-3.5-turbo')
+
+  // AI-powered flow
+  const aiFlow = addKeyword(['ai', 'gpt', 'chat'])
+    .addAnswer('🤖 ChatGPT mode activated! Ask me anything.')
+    .addAction({ capture: true }, async (ctx, { flowDynamic, state }) => {
+      try {
+        const userMessage = ctx.body
+        const userId = ctx.from
+
+        // Get response from ChatGPT
+        const response = await chatGPT.chat(
+          userId,
+          userMessage,
+          'You are a friendly and helpful WhatsApp assistant.'
+        )
+
+        await flowDynamic(response)
+      } catch (error) {
+        console.error('ChatGPT Error:', error)
+        await flowDynamic('Sorry, I encountered an error. Please try again.')
+      }
+    })
+
+  // Reset conversation flow
+  const resetFlow = addKeyword(['reset', 'clear', 'restart'])
+    .addAnswer('🔄 Conversation reset!', null, async (ctx) => {
+      chatGPT.clearConversation(ctx.from)
+    })
+
+  // Welcome flow
+  const welcomeFlow = addKeyword(['hello', 'hi', 'hey'])
+    .addAnswer('👋 Hello! I\'m powered by ChatGPT.')
+    .addAnswer('Type "ai" to start an AI conversation or just chat with me!')
+
+  const adapterFlow = createFlow([welcomeFlow, aiFlow, resetFlow])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  console.log('🤖 Bot with ChatGPT ready!')
+}
+
+main()
+```
+
+```typescript app.ts
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import { ChatGPTService } from './chat-service'
+import 'dotenv/config'
+
+const main = async () => {
+  const adapterDB = new MemoryDB()
+  const adapterProvider = createProvider(BaileysProvider)
+
+  // Initialize ChatGPT service
+  const chatGPT = new ChatGPTService('gpt-3.5-turbo')
+
+  // AI-powered flow
+  const aiFlow = addKeyword(['ai', 'gpt', 'chat'])
+    .addAnswer('🤖 ChatGPT mode activated! Ask me anything.')
+    .addAction({ capture: true }, async (ctx, { flowDynamic }) => {
+      try {
+        const userMessage = ctx.body
+        const userId = ctx.from
+
+        // Get response from ChatGPT
+        const response = await chatGPT.chat(
+          userId,
+          userMessage,
+          'You are a friendly and helpful WhatsApp assistant.'
+        )
+
+        await flowDynamic(response)
+      } catch (error) {
+        console.error('ChatGPT Error:', error)
+        await flowDynamic('Sorry, I encountered an error. Please try again.')
+      }
+    })
+
+  // Reset conversation flow
+  const resetFlow = addKeyword(['reset', 'clear', 'restart'])
+    .addAnswer('🔄 Conversation reset!', null, async (ctx) => {
+      chatGPT.clearConversation(ctx.from)
+    })
+
+  // Welcome flow
+  const welcomeFlow = addKeyword(['hello', 'hi', 'hey'])
+    .addAnswer('👋 Hello! I\'m powered by ChatGPT.')
+    .addAnswer('Type "ai" to start an AI conversation or just chat with me!')
+
+  const adapterFlow = createFlow([welcomeFlow, aiFlow, resetFlow])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  console.log('🤖 Bot with ChatGPT ready!')
+}
+
+main()
+```
+</CodeGroup>
+
+## Advanced Features
+
+### Custom System Prompts
+
+Tailor ChatGPT's behavior for different use cases:
+
+```javascript
+// Customer Support Bot
+const supportPrompt = `You are a customer support agent for an e-commerce company. 
+Be helpful, professional, and empathetic. Keep responses concise and actionable.`
+
+const response = await chatGPT.chat(userId, message, supportPrompt)
+```
+
+```javascript
+// Sales Assistant
+const salesPrompt = `You are a friendly sales assistant. Help customers find products,
+answer questions, and guide them through the purchase process. Be enthusiastic but not pushy.`
+```
+
+### Function Calling
+
+Use OpenAI's function calling to integrate with external APIs:
+
+<CodeGroup>
+```javascript function-calling.js
+const { openai } = require('./openai-client')
+
+async function chatWithFunctions(userId, message) {
+  const tools = [
+    {
+      type: 'function',
+      function: {
+        name: 'get_order_status',
+        description: 'Get the status of a customer order',
+        parameters: {
+          type: 'object',
+          properties: {
+            order_id: {
+              type: 'string',
+              description: 'The order ID'
+            }
+          },
+          required: ['order_id']
+        }
+      }
+    }
+  ]
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [
+      { role: 'user', content: message }
+    ],
+    tools: tools,
+    tool_choice: 'auto'
+  })
+
+  const responseMessage = response.choices[0].message
+  
+  // Check if function was called
+  if (responseMessage.tool_calls) {
+    const toolCall = responseMessage.tool_calls[0]
+    const functionName = toolCall.function.name
+    const functionArgs = JSON.parse(toolCall.function.arguments)
+    
+    // Execute your function
+    if (functionName === 'get_order_status') {
+      const orderStatus = await getOrderStatus(functionArgs.order_id)
+      return `Order ${functionArgs.order_id} status: ${orderStatus}`
+    }
+  }
+
+  return responseMessage.content
+}
+```
+
+```typescript function-calling.ts
+import { openai } from './openai-client'
+import type { ChatCompletionTool } from 'openai/resources/chat'
+
+async function chatWithFunctions(userId: string, message: string): Promise<string> {
+  const tools: ChatCompletionTool[] = [
+    {
+      type: 'function',
+      function: {
+        name: 'get_order_status',
+        description: 'Get the status of a customer order',
+        parameters: {
+          type: 'object',
+          properties: {
+            order_id: {
+              type: 'string',
+              description: 'The order ID'
+            }
+          },
+          required: ['order_id']
+        }
+      }
+    }
+  ]
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [
+      { role: 'user', content: message }
+    ],
+    tools: tools,
+    tool_choice: 'auto'
+  })
+
+  const responseMessage = response.choices[0].message
+  
+  // Check if function was called
+  if (responseMessage.tool_calls) {
+    const toolCall = responseMessage.tool_calls[0]
+    const functionName = toolCall.function.name
+    const functionArgs = JSON.parse(toolCall.function.arguments)
+    
+    // Execute your function
+    if (functionName === 'get_order_status') {
+      const orderStatus = await getOrderStatus(functionArgs.order_id)
+      return `Order ${functionArgs.order_id} status: ${orderStatus}`
+    }
+  }
+
+  return responseMessage.content || ''
+}
+```
+</CodeGroup>
+
+### Streaming Responses
+
+Stream responses for a more interactive experience:
+
+```javascript
+async function streamChat(userId, message) {
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-3.5-turbo',
+    messages: [{ role: 'user', content: message }],
+    stream: true,
+  })
+
+  let fullResponse = ''
+  
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || ''
+    fullResponse += content
+    // You can send partial updates to the user here
+  }
+
+  return fullResponse
+}
+```
+
+### Image Analysis (GPT-4 Vision)
+
+Analyze images sent by users:
+
+```javascript
+const visionFlow = addKeyword(['analyze', 'describe'])
+  .addAction(async (ctx, { flowDynamic }) => {
+    if (!ctx.message?.imageMessage) {
+      return flowDynamic('Please send an image to analyze.')
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What\'s in this image?' },
+            {
+              type: 'image_url',
+              image_url: {
+                url: ctx.message.imageMessage.url
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 300
+    })
+
+    await flowDynamic(response.choices[0].message.content)
+  })
+```
+
+## Configuration Options
+
+### Model Selection
+
+<CodeGroup>
+```javascript
+// GPT-3.5 Turbo - Fast and cost-effective
+const chatGPT = new ChatGPTService('gpt-3.5-turbo')
+
+// GPT-4 - More capable, higher quality
+const chatGPT = new ChatGPTService('gpt-4')
+
+// GPT-4 Turbo - Latest, faster, cheaper than GPT-4
+const chatGPT = new ChatGPTService('gpt-4-turbo-preview')
+```
+</CodeGroup>
+
+### Temperature & Parameters
+
+```javascript
+const response = await openai.chat.completions.create({
+  model: 'gpt-3.5-turbo',
+  messages: conversation,
+  temperature: 0.7,      // Creativity (0-2, default: 1)
+  max_tokens: 500,       // Response length limit
+  top_p: 1,              // Nucleus sampling
+  frequency_penalty: 0,  // Penalize repetition
+  presence_penalty: 0,   // Encourage new topics
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="API Key Security">
+    - Store API keys in environment variables
+    - Never commit keys to version control
+    - Use separate keys for development and production
+    - Rotate keys regularly
+    - Monitor usage in OpenAI dashboard
+  </Accordion>
+
+  <Accordion title="Cost Management">
+    - Use GPT-3.5-turbo for most use cases (cheaper)
+    - Set `max_tokens` to limit response size
+    - Implement rate limiting per user
+    - Monitor token usage
+    - Clear old conversations to save memory
+  </Accordion>
+
+  <Accordion title="Conversation Management">
+    - Limit conversation history (10-20 messages)
+    - Provide clear reset commands
+    - Set appropriate system prompts
+    - Handle context window limits
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    - Catch and handle API errors gracefully
+    - Implement retry logic for transient failures
+    - Provide fallback responses
+    - Log errors for debugging
+  </Accordion>
+
+  <Accordion title="Response Quality">
+    - Use clear, specific system prompts
+    - Test different temperature values
+    - Validate responses before sending
+    - Handle inappropriate content
+  </Accordion>
+</AccordionGroup>
+
+## Pricing Considerations
+
+| Model | Input (per 1K tokens) | Output (per 1K tokens) |
+|-------|----------------------|------------------------|
+| GPT-3.5 Turbo | $0.0005 | $0.0015 |
+| GPT-4 | $0.03 | $0.06 |
+| GPT-4 Turbo | $0.01 | $0.03 |
+
+<Tip>
+  Start with GPT-3.5 Turbo for development. It's cost-effective and sufficient for most conversational use cases.
+</Tip>
+
+## Troubleshooting
+
+### API Key Errors
+
+```
+Error: Incorrect API key provided
+```
+
+**Solution**: Verify your `.env` file has the correct API key:
+```bash
+OPENAI_API_KEY=sk-proj-...
+```
+
+### Rate Limit Errors
+
+```
+Error: Rate limit exceeded
+```
+
+**Solution**: Implement rate limiting or upgrade your OpenAI plan.
+
+### Context Length Errors
+
+```
+Error: This model's maximum context length is...
+```
+
+**Solution**: Reduce conversation history or use a model with larger context window.
+
+## Examples Repository
+
+Find more examples:
+- Customer support bot
+- Sales assistant
+- FAQ automation
+- Content generation
+- Translation service
+
+## Related Resources
+
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+- [OpenAI Pricing](https://openai.com/pricing)
+- [OpenAI Cookbook](https://cookbook.openai.com/)
+- [BuilderBot Flows](/concepts/flows)

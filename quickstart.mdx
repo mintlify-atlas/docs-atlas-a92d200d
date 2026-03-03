@@ -1,80 +1,191 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get your first BuilderBot chatbot running in under 5 minutes
 ---
 
-## Get started in three steps
+Get your first BuilderBot chatbot up and running in minutes with this quick start guide.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+- Node.js 18 or higher
+- npm, pnpm, or yarn package manager
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Create your first bot
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Create a new project">
+    Use the BuilderBot CLI to scaffold a new project:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <CodeGroup>
+    ```bash npm
+    npm create builderbot@latest
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```bash pnpm
+    pnpm create builderbot@latest
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash yarn
+    yarn create builderbot
+    ```
+    </CodeGroup>
 
-### Step 3: Go live
+    You'll be prompted to choose:
+    - **Project name**: Your bot's directory name
+    - **Provider**: Messaging platform (start with Baileys for WhatsApp)
+    - **Database**: Storage option (start with Memory for testing)
+    - **Language**: TypeScript or JavaScript
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Navigate to your project">
+    ```bash
+    cd your-project-name
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    <CodeGroup>
+    ```bash npm
+    npm install
+    ```
+
+    ```bash pnpm
+    pnpm install
+    ```
+
+    ```bash yarn
+    yarn install
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start your bot">
+    <CodeGroup>
+    ```bash npm
+    npm start
+    ```
+
+    ```bash pnpm
+    pnpm start
+    ```
+
+    ```bash yarn
+    yarn start
+    ```
+    </CodeGroup>
+
+    <Note>
+    For WhatsApp providers like Baileys, scan the QR code that appears in your terminal with WhatsApp.
+    </Note>
+  </Step>
+
+  <Step title="Test your bot">
+    Send a message to your bot:
+    - Send `hi`, `hello`, or `hola` to trigger the welcome flow
+    - Type `doc` to see the documentation flow
+    - Try `samples` to receive media files
+  </Step>
+</Steps>
+
+## Understanding the basic structure
+
+Your generated bot includes a simple conversation flow. Here's what the code looks like:
+
+```javascript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { MemoryDB as Database } from '@builderbot/bot'
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+
+// Define a simple welcome flow
+const welcomeFlow = addKeyword(['hi', 'hello', 'hola'])
+    .addAnswer('🙌 Hello welcome to this *Chatbot*')
+    .addAnswer('I share with you the following links of interest about the project')
+
+// Create the bot
+const main = async () => {
+    const adapterFlow = createFlow([welcomeFlow])
+    const adapterProvider = createProvider(Provider)
+    const adapterDB = new Database()
+
+    await createBot({
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    })
+}
+
+main()
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Learn core concepts" icon="book" href="/concepts/flows">
+    Understand flows, keywords, and conversation patterns
+  </Card>
+  
+  <Card title="Explore providers" icon="plug" href="/providers/overview">
+    Connect to WhatsApp, Telegram, email, and more
+  </Card>
+  
+  <Card title="Add a database" icon="database" href="/databases/overview">
+    Persist conversations with MongoDB, PostgreSQL, or MySQL
+  </Card>
+  
+  <Card title="Build advanced flows" icon="code" href="/guides/creating-flows">
+    Create complex multi-step conversations
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Common patterns
+
+### Capture user input
+
+```javascript
+const nameFlow = addKeyword('register')
+    .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ name: ctx.body })
+    })
+    .addAnswer('What is your email?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ email: ctx.body })
+    })
+    .addAction(async (_, { flowDynamic, state }) => {
+        await flowDynamic(`Thanks ${state.get('name')}! We'll contact you at ${state.get('email')}`)
+    })
+```
+
+### Send media
+
+```javascript
+const mediaFlow = addKeyword('photo')
+    .addAnswer('Here is your image', { 
+        media: 'https://example.com/image.jpg' 
+    })
+```
+
+### Create custom HTTP endpoints
+
+```javascript
+const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+})
+
+adapterProvider.server.post(
+    '/v1/messages',
+    handleCtx(async (bot, req, res) => {
+        const { number, message } = req.body
+        await bot.sendMessage(number, message)
+        return res.end('sent')
+    })
+)
+
+httpServer(3000)
+```
+
+## Need help?
+
+- Join our [Discord community](https://link.codigoencasa.com/DISCORD)
+- Check the [FAQ](/community/faq)
+- View [example projects](/community/examples)

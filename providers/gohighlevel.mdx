@@ -1,0 +1,170 @@
+---
+title: GoHighLevel Provider
+description: GoHighLevel CRM platform integration
+---
+
+The GoHighLevel provider integrates BuilderBot with the GoHighLevel CRM and marketing automation platform, enabling automated messaging through the GHL infrastructure.
+
+## Features
+
+- CRM integration
+- SMS messaging
+- WhatsApp via GHL
+- Contact management
+- Workflow automation
+- Campaign integration
+- Lead tracking
+
+## Prerequisites
+
+<Steps>
+  <Step title="GoHighLevel Account">
+    Sign up for a GoHighLevel account
+  </Step>
+  
+  <Step title="Create API Key">
+    Generate an API key from your GHL settings
+  </Step>
+  
+  <Step title="Configure Location">
+    Set up your location/sub-account in GHL
+  </Step>
+</Steps>
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-gohighlevel
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { GoHighLevelProvider } from '@builderbot/provider-gohighlevel'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(GoHighLevelProvider, {
+  apiKey: 'YOUR_GHL_API_KEY',
+  locationId: 'YOUR_LOCATION_ID',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Environment Variables
+
+```env
+GHL_API_KEY=your_api_key
+GHL_LOCATION_ID=your_location_id
+PORT=3000
+```
+
+## Basic Usage
+
+### Sending Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to our business')
+  .addAnswer('How can we help you today?')
+```
+
+### CRM Integration
+
+```typescript
+const leadFlow = addKeyword('interested')
+  .addAction(async (ctx, { provider }) => {
+    // Contact is automatically created/updated in GHL
+    await provider.sendMessage(
+      ctx.from,
+      'Great! One of our team members will contact you soon.'
+    )
+  })
+```
+
+## Contact Management
+
+GoHighLevel automatically manages contacts:
+
+- Creates new contacts from conversations
+- Updates existing contact information
+- Tracks conversation history
+- Tags and segments contacts
+
+## Webhook Configuration
+
+### Webhook Endpoints
+
+```
+POST /webhook - Receive messages from GHL
+```
+
+### GHL Setup
+
+1. Go to GoHighLevel Settings
+2. Navigate to Integrations > Webhooks
+3. Add webhook URL: `https://your-domain.com/webhook`
+4. Subscribe to message events
+
+## Campaigns and Workflows
+
+Integrate with GHL campaigns:
+
+```typescript
+const campaignFlow = addKeyword('CAMPAIGN_TRIGGER')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    // Triggered by GHL workflow
+    await flowDynamic('Welcome to our campaign!')
+  })
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="CRM Hygiene">
+    - Keep contact data clean
+    - Use proper tagging
+    - Segment audiences appropriately
+    - Update contact status regularly
+  </Accordion>
+
+  <Accordion title="Workflow Integration">
+    - Use GHL workflows for complex logic
+    - Trigger bot flows from GHL campaigns
+    - Track conversion events
+    - Monitor automation performance
+  </Accordion>
+
+  <Accordion title="Compliance">
+    - Follow SMS regulations (TCPA, etc.)
+    - Obtain proper consent
+    - Provide opt-out mechanisms
+    - Respect do-not-contact lists
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+- **Lead Qualification**: Automate initial lead responses
+- **Appointment Booking**: Integrate with GHL calendar
+- **Follow-ups**: Automated nurture sequences
+- **Customer Support**: Handle common inquiries
+- **Notifications**: Send updates and alerts
+
+## Further Resources
+
+- [GoHighLevel Documentation](https://developers.gohighlevel.com)
+- [GoHighLevel API](https://developers.gohighlevel.com/api-docs)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

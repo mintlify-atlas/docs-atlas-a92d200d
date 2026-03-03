@@ -1,0 +1,399 @@
+---
+title: CLI Commands
+description: Complete reference for all BuilderBot CLI commands and options
+---
+
+The BuilderBot CLI provides several commands for managing your chatbot projects. This page documents all available commands, their options, and usage examples.
+
+## Global Commands
+
+### `bot`
+
+The main CLI entry point for BuilderBot tools.
+
+```bash
+bot
+```
+
+Running `bot` without arguments launches the interactive project creation wizard, equivalent to `npm create builderbot`.
+
+## Project Creation
+
+### Interactive Creation
+
+Launch the interactive setup wizard:
+
+```bash
+npm create builderbot@latest
+```
+
+Or using the global CLI:
+
+```bash
+bot
+```
+
+The wizard will guide you through:
+
+1. **Confirmation prompt**: "Do you want to continue?"
+2. **Provider selection**: Choose your WhatsApp/messaging provider
+3. **Database selection**: Choose your data storage backend
+4. **Language selection**: Choose TypeScript or JavaScript
+
+### Non-Interactive Creation
+
+Create a project with predefined configuration:
+
+```bash
+npm create builderbot@latest -- --provider=<provider> --database=<database> --language=<language>
+```
+
+**Required flags:**
+
+- `--provider` - WhatsApp/messaging provider
+- `--database` - Database backend
+- `--language` - Programming language (ts or js)
+
+**Example:**
+
+```bash
+npm create builderbot@latest -- --provider=baileys --database=mongo --language=ts
+```
+
+## Command Reference
+
+While the main CLI focuses on project creation, here are the internal commands and modules available:
+
+### Check Commands
+
+These commands run automatically during project creation to verify system requirements.
+
+#### Check Node Version
+
+Verifies Node.js version is 20 or higher.
+
+**Source:** `src/check/index.ts:9`
+
+```typescript
+import { checkNodeVersion } from '@builderbot/cli'
+
+const result = await checkNodeVersion()
+// Returns: { pass: boolean, message: string }
+```
+
+#### Check Git Installation
+
+Verifies Git is installed and accessible.
+
+**Source:** `src/check/index.ts:31`
+
+```typescript
+import { checkGit } from '@builderbot/cli'
+
+const result = await checkGit()
+// Returns: { pass: boolean, message: string }
+```
+
+#### Check Operating System
+
+Detects the current operating system.
+
+**Source:** `src/check/index.ts:21`
+
+```typescript
+import { checkOs } from '@builderbot/cli'
+
+const os = await checkOs()
+// Returns: string (e.g., "OS: linux")
+```
+
+### Clean Commands
+
+#### Clean Session
+
+Removes WhatsApp Web session files and authentication data.
+
+**Source:** `src/clean/index.ts:11`
+
+```typescript
+import { cleanSession } from '@builderbot/cli'
+
+await cleanSession()
+```
+
+This removes:
+- `.wwebjs_auth` directory
+- `session.json` file
+
+**Use case:** When you need to reset WhatsApp authentication or switch accounts.
+
+### Install Commands
+
+#### Install All Dependencies
+
+Installs or updates BuilderBot packages.
+
+**Source:** `src/install/index.ts:27`
+
+```typescript
+import { installAll } from '@builderbot/cli'
+
+await installAll()
+```
+
+#### Get Package Manager
+
+Detects the package manager being used (npm, yarn, or pnpm).
+
+**Source:** `src/install/tool.ts:11`
+
+Currently defaults to npm.
+
+### Configuration Options
+
+The CLI uses predefined configurations for providers, databases, and languages.
+
+#### Provider List
+
+**Source:** `src/configuration/index.ts:19`
+
+All available WhatsApp and messaging providers:
+
+```typescript
+const PROVIDER_LIST = [
+  { value: 'baileys', label: 'Baileys', hint: 'opensource' },
+  { value: 'sherpa', label: 'Sherpa', hint: 'opensource' },
+  { value: 'evolution-api', label: 'Evolution API', hint: 'opensource' },
+  { value: 'wppconnect', label: 'WPPConnect', hint: 'opensource' },
+  { value: 'twilio', label: 'Twilio' },
+  { value: 'meta', label: 'Meta' },
+  { value: 'facebook-messenger', label: 'Facebook Messenger' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'gohighlevel', label: 'GoHighLevel' },
+  { value: 'email', label: 'Email', hint: 'IMAP/SMTP' },
+]
+```
+
+#### Database List
+
+**Source:** `src/configuration/index.ts:34`
+
+All available database backends:
+
+```typescript
+const PROVIDER_DATA = [
+  { value: 'memory', label: 'Memory' },
+  { value: 'json', label: 'Json' },
+  { value: 'mongo', label: 'Mongo' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'postgres', label: 'PostgreSQL' },
+]
+```
+
+#### Language Options
+
+**Source:** `src/configuration/index.ts:42`
+
+Supported programming languages:
+
+```typescript
+const AVAILABLE_LANGUAGES = [
+  { value: 'ts', label: 'TypeScript' },
+  { value: 'js', label: 'JavaScript' },
+]
+```
+
+## Usage Examples
+
+### Example 1: Create a Baileys Bot with MongoDB (TypeScript)
+
+```bash
+# Interactive mode
+npm create builderbot@latest
+# Select: Baileys > Mongo > TypeScript
+
+# Non-interactive mode
+npm create builderbot@latest -- --provider=baileys --database=mongo --language=ts
+
+# Navigate and start
+cd base-ts-baileys-mongo
+npm install
+npm run dev
+```
+
+### Example 2: Create a Twilio Bot with PostgreSQL (JavaScript)
+
+```bash
+# Interactive mode
+npm create builderbot@latest
+# Select: Twilio > PostgreSQL > JavaScript
+
+# Non-interactive mode
+npm create builderbot@latest -- --provider=twilio --database=postgres --language=js
+
+# Navigate and start
+cd base-js-twilio-postgres
+npm install
+npm start
+```
+
+### Example 3: Create an Email Bot with JSON Storage
+
+```bash
+# Create project
+npm create builderbot@latest -- --provider=email --database=json --language=ts
+
+# Setup
+cd base-ts-email-json
+npm install
+
+# Configure email credentials
+cp .env.example .env
+# Edit .env with IMAP/SMTP settings
+
+# Start
+npm run dev
+```
+
+### Example 4: Create a Meta Bot for Production
+
+```bash
+# Create with PostgreSQL for production reliability
+npm create builderbot@latest -- --provider=meta --database=postgres --language=ts
+
+cd base-ts-meta-postgres
+npm install
+
+# Configure Meta API credentials
+cp .env.example .env
+# Add: META_ACCESS_TOKEN, META_PHONE_NUMBER_ID, etc.
+
+# Development
+npm run dev
+
+# Production build
+npm run build
+npm start
+```
+
+## Command Options Reference
+
+### Provider Options
+
+| Value | Label | Type | Description |
+|-------|-------|------|-------------|
+| `baileys` | Baileys | Open Source | Pure TypeScript WhatsApp library |
+| `sherpa` | Sherpa | Open Source | Lightweight WhatsApp integration |
+| `evolution-api` | Evolution API | Open Source | RESTful WhatsApp API |
+| `wppconnect` | WPPConnect | Open Source | Browser-based automation |
+| `twilio` | Twilio | Commercial | Enterprise messaging platform |
+| `meta` | Meta | Commercial | Official WhatsApp Business API |
+| `facebook-messenger` | Facebook Messenger | Commercial | Facebook messaging |
+| `instagram` | Instagram | Commercial | Instagram direct messages |
+| `gohighlevel` | GoHighLevel | Commercial | Marketing automation |
+| `email` | Email | Open Source | IMAP/SMTP email integration |
+
+### Database Options
+
+| Value | Label | Best For | Persistence |
+|-------|-------|----------|-------------|
+| `memory` | Memory | Development, testing | No |
+| `json` | JSON | Small projects, prototypes | Yes (file-based) |
+| `mongo` | MongoDB | Scalable applications | Yes (NoSQL) |
+| `mysql` | MySQL | Traditional applications | Yes (SQL) |
+| `postgres` | PostgreSQL | Production systems | Yes (SQL) |
+
+### Language Options
+
+| Value | Label | Features | Best For |
+|-------|-------|----------|----------|
+| `ts` | TypeScript | Type safety, autocomplete, compile-time checks | Large projects, teams |
+| `js` | JavaScript | Quick start, flexibility | Rapid prototyping, simple bots |
+
+## Programmatic Usage
+
+You can use the CLI programmatically in your Node.js scripts:
+
+```typescript
+import { start } from '@builderbot/cli'
+
+// Launch interactive wizard
+await start()
+```
+
+Or create a custom creation flow:
+
+```typescript
+import { copyBaseApp } from '@builderbot/cli'
+import { join } from 'path'
+
+const templatePath = join(__dirname, 'templates', 'base-ts-baileys-mongo')
+const projectPath = join(process.cwd(), 'my-bot')
+
+await copyBaseApp(templatePath, projectPath)
+```
+
+## Environment Variables
+
+### `NODE_ENV`
+
+Set to `dev` to enable development mode:
+
+```bash
+NODE_ENV=dev bot
+```
+
+## Troubleshooting
+
+### TTY Initialization Failed
+
+If you see `ERR_TTY_INIT_FAILED`, the CLI will automatically fall back to legacy mode with basic prompts.
+
+### Template Not Found
+
+If you get `TEMPLATE_PATH_NOT_FOUND`, ensure you're using valid provider, database, and language combinations.
+
+### Permission Errors
+
+On Unix systems, you may need to make the CLI executable:
+
+```bash
+chmod +x /path/to/node_modules/.bin/bot
+```
+
+## Version Information
+
+Check your installed CLI version:
+
+```bash
+npm list @builderbot/cli
+```
+
+Or for create-builderbot:
+
+```bash
+npm list create-builderbot
+```
+
+Current stable version: `1.3.15-alpha.10`
+
+## Package Information
+
+### @builderbot/cli
+
+- **npm package:** `@builderbot/cli`
+- **Binary:** `bot`
+- **Repository:** [GitHub](https://github.com/codigoencasa/bot-whatsapp/tree/main/packages/cli)
+
+### create-builderbot
+
+- **npm package:** `create-builderbot`
+- **Usage:** `npm create builderbot`
+- **Repository:** [GitHub](https://github.com/codigoencasa/bot-whatsapp/tree/main/packages/create-builderbot)
+
+## Related Resources
+
+- [BuilderBot Documentation](https://builderbot.app)
+- [Discord Community](https://link.codigoencasa.com/DISCORD)
+- [GitHub Repository](https://github.com/codigoencasa/bot-whatsapp)
+- [Official Course](https://app.codigoencasa.com/courses/builderbot?refCode=LEIFER)

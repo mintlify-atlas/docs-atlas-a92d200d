@@ -1,0 +1,440 @@
+---
+title: Provider Architecture
+description: Understanding the provider system in BuilderBot for multi-platform messaging
+---
+
+## What is a Provider?
+
+A **provider** is an adapter that connects BuilderBot to a specific messaging platform (WhatsApp, Telegram, Instagram, Meta, etc.). The provider handles platform-specific communication, message sending, media handling, and event management.
+
+## Provider Class Overview
+
+All providers extend the abstract `ProviderClass`, which defines a standard interface:
+
+```typescript
+abstract class ProviderClass<V = any> 
+  extends EventEmitterClass<ProviderEventTypes> 
+  implements ProviderHttpServer {
+  
+  public abstract globalVendorArgs: GlobalVendorArgs
+  public vendor: Vendor<V>
+  public server: Polka
+  public idBotName: string = 'bot'
+  public idCtxBot: string = 'id-ctx-bot'
+}
+```
+
+**Key Components:**
+- `vendor` - The underlying messaging platform SDK/API instance
+- `server` - HTTP server (Polka) for webhooks and API endpoints
+- Event emitter capabilities for message handling
+- Abstract methods that each provider must implement
+
+## Creating a Provider
+
+Use the `createProvider` function to instantiate a provider:
+
+```typescript
+import { createProvider } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const adapterProvider = createProvider(BaileysProvider)
+```
+
+### With Configuration
+
+```typescript
+const adapterProvider = createProvider(MetaProvider, {
+  jwtToken: 'your-jwt-token',
+  numberId: 'phone-number-id',
+  verifyToken: 'verify-token',
+  version: 'v21.0'
+})
+```
+
+## Available Providers
+
+BuilderBot supports multiple messaging platforms:
+
+<Tabs>
+  <Tab title="Baileys (WhatsApp)">
+    ```typescript
+    import { BaileysProvider } from '@builderbot/provider-baileys'
+    
+    const provider = createProvider(BaileysProvider, {
+      name: 'bot-name',
+      port: 3008
+    })
+    ```
+    Direct WhatsApp connection using Baileys library.
+  </Tab>
+  
+  <Tab title="Meta (WhatsApp Business)">
+    ```typescript
+    import { MetaProvider } from '@builderbot/provider-meta'
+    
+    const provider = createProvider(MetaProvider, {
+      jwtToken: process.env.JWT_TOKEN,
+      numberId: process.env.NUMBER_ID,
+      verifyToken: process.env.VERIFY_TOKEN,
+      version: 'v21.0'
+    })
+    ```
+    Official WhatsApp Business API.
+  </Tab>
+  
+  <Tab title="Telegram">
+    ```typescript
+    import { TelegramProvider } from '@builderbot/provider-telegram'
+    
+    const provider = createProvider(TelegramProvider, {
+      token: process.env.TELEGRAM_BOT_TOKEN
+    })
+    ```
+    Telegram Bot API integration.
+  </Tab>
+  
+  <Tab title="Twilio">
+    ```typescript
+    import { TwilioProvider } from '@builderbot/provider-twilio'
+    
+    const provider = createProvider(TwilioProvider, {
+      accountSid: process.env.TWILIO_ACCOUNT_SID,
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      vendorNumber: process.env.TWILIO_NUMBER
+    })
+    ```
+    Twilio messaging API.
+  </Tab>
+</Tabs>
+
+## Provider Lifecycle
+
+Providers follow a specific initialization sequence:
+
+<Steps>
+  <Step title="Construction">
+    Provider instance is created and HTTP server is built:
+    ```typescript
+    constructor() {
+      super()
+      this.server = this.buildHTTPServer()
+    }
+    ```
+  </Step>
+  
+  <Step title="Vendor Initialization">
+    The platform-specific SDK is initialized:
+    ```typescript
+    protected abstract initVendor(): Promise<any>
+    ```
+  </Step>
+  
+  <Step title="Event Registration">
+    Platform events are registered and listeners attached:
+    ```typescript
+    protected abstract busEvents(): Array<{
+      event: string | number | symbol
+      func: Function
+    }>
+    ```
+  </Step>
+  
+  <Step title="HTTP Server Start">
+    Webhook endpoints and HTTP server start listening:
+    ```typescript
+    beforeHttpServerInit()
+    start(methods, callback)
+    afterHttpServerInit()
+    ```
+  </Step>
+</Steps>
+
+## Abstract Methods
+
+Each provider must implement these core methods:
+
+### sendMessage
+
+```typescript
+public abstract sendMessage<K = any>(
+  userId: string,
+  message: any,
+  args?: any
+): Promise<K>
+```
+
+Send a message to a user on the platform.
+
+**Example:**
+```typescript
+await provider.sendMessage('1234567890', 'Hello!', {
+  media: 'https://example.com/image.jpg'
+})
+```
+
+### saveFile
+
+```typescript
+public abstract saveFile(
+  ctx: any,
+  options?: { path: string }
+): Promise<string>
+```
+
+Download and save media files from messages.
+
+**Example:**
+```typescript
+const filePath = await provider.saveFile(ctx, {
+  path: './downloads'
+})
+```
+
+### initVendor
+
+```typescript
+protected abstract initVendor(): Promise<any>
+```
+
+Initialize the platform SDK/API client.
+
+### busEvents
+
+```typescript
+protected abstract busEvents(): Array<{
+  event: string | number | symbol
+  func: Function
+}>
+```
+
+Define platform event listeners.
+
+## HTTP Server
+
+Every provider includes a built-in HTTP server (Polka) for webhooks and custom endpoints:
+
+```typescript
+public buildHTTPServer(): Polka {
+  return polka()
+    .use(cors())
+    .use(urlencoded({ extended: true }))
+    .use(json())
+}
+```
+
+### Adding Custom Endpoints
+
+```typescript
+const { handleCtx } = await createBot({
+  flow: adapterFlow,
+  provider: adapterProvider,
+  database: adapterDB,
+})
+
+// Custom endpoint for sending messages via API
+adapterProvider.server.post(
+  '/v1/messages',
+  handleCtx(async (bot, req, res) => {
+    const { number, message, urlMedia } = req.body
+    await bot.sendMessage(number, message, { media: urlMedia ?? null })
+    return res.end('sent')
+  })
+)
+
+// Custom endpoint for triggering flows
+adapterProvider.server.post(
+  '/v1/register',
+  handleCtx(async (bot, req, res) => {
+    const { number, name } = req.body
+    await bot.dispatch('REGISTER_FLOW', { from: number, name })
+    return res.end('triggered')
+  })
+)
+```
+
+### Route Discovery
+
+Get all registered routes:
+
+```typescript
+const routes = provider.getListRoutes(provider.server)
+console.log(routes)
+// Output:
+// [
+//   '[POST]: http://localhost:3008/v1/messages',
+//   '[POST]: http://localhost:3008/v1/register',
+//   '[GET]: http://localhost:3008/webhook'
+// ]
+```
+
+## Event System
+
+Providers emit events that BuilderBot listens to:
+
+```typescript
+type ProviderEventTypes = {
+  message: [arg1: BotContext]
+  require_action: [arg1: {
+    title: string
+    instructions: string[]
+    payload?: { qr?: string; code?: string; [key: string]: any }
+  }]
+  notice: [arg1: { title: string; instructions: string[] }]
+  ready: any
+  auth_failure: any
+  host: any
+  [key: string]: any
+}
+```
+
+### Listening to Provider Events
+
+```typescript
+adapterProvider.on('ready', () => {
+  console.log('Provider is ready!')
+})
+
+adapterProvider.on('message', (ctx) => {
+  console.log('Message received:', ctx.body)
+})
+
+adapterProvider.on('notice', ({ title, instructions }) => {
+  console.log(title)
+  instructions.forEach(i => console.log(i))
+})
+```
+
+## Dispatching Custom Events
+
+Trigger flows programmatically using the dispatch method:
+
+```typescript
+public dispatchInside(payload: {
+  body: string
+  name: string
+  from: string
+}) {
+  this.emit('message', { ...payload })
+}
+```
+
+**Example:**
+```typescript
+adapterProvider.dispatchInside({
+  from: '1234567890',
+  name: 'John Doe',
+  body: setEvent('WELCOME')
+})
+```
+
+## Context Middleware
+
+The `inHandleCtx` method provides a safe wrapper for HTTP endpoint handlers:
+
+```typescript
+public inHandleCtx<T extends Pick<ProviderClass<V>, 'sendMessage'> & {
+  provider: V
+}>(
+  ctxPolka: (bot: T, req: Request, res: PolkaRes) => Promise<void>
+): (...args: any[]) => any
+```
+
+**Features:**
+- Automatic error handling
+- Bot context injection
+- Authentication state validation
+
+## Starting and Stopping
+
+### Start the Server
+
+```typescript
+public start(
+  vendor: BotCtxMiddleware,
+  cb: (arg?: any) => void = () => null
+): void
+```
+
+Called internally by `createBot`, but can be invoked manually if needed.
+
+### Stop the Server
+
+```typescript
+public stop(): Promise<void>
+```
+
+Gracefully shutdown the HTTP server:
+
+```typescript
+await adapterProvider.stop()
+console.log('Provider stopped')
+```
+
+## Practical Example
+
+Complete bot setup with provider configuration:
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import { MemoryDB } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Welcome to our bot!')
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  // Custom API endpoint
+  adapterProvider.server.post(
+    '/v1/send',
+    handleCtx(async (bot, req, res) => {
+      const { to, message } = req.body
+      await bot.sendMessage(to, message)
+      res.end('Message sent')
+    })
+  )
+
+  // Listen on custom events
+  adapterProvider.on('ready', () => {
+    console.log('Bot is ready!')
+  })
+
+  httpServer(3008)
+}
+
+main()
+```
+
+## Best Practices
+
+<Tip>
+  **Environment Variables**: Store sensitive credentials in environment variables, never hardcode them.
+</Tip>
+
+<Warning>
+  **Error Handling**: Always implement error handling in custom endpoints to prevent crashes.
+</Warning>
+
+<Note>
+  **Port Configuration**: Ensure the port number doesn't conflict with other services. The default is 3008.
+</Note>
+
+<Tip>
+  **Multiple Providers**: You can run multiple bots with different providers simultaneously by using different ports.
+</Tip>
+
+## Related Concepts
+
+- [Databases](/concepts/databases) - Connect database adapters
+- [Events](/concepts/events) - Event system and custom events
+- [State Management](/concepts/state-management) - Manage conversation state

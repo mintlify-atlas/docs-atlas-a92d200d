@@ -1,0 +1,170 @@
+---
+title: Database Adapters Overview
+description: Choose and configure the right database adapter for your BuilderBot application
+---
+
+BuilderBot provides multiple database adapters to persist conversation history and user data. Choose the adapter that best fits your infrastructure and scaling needs.
+
+## Available Adapters
+
+<CardGroup cols={2}>
+  <Card title="MemoryDB" icon="memory" href="/databases/memory">
+    In-memory storage for development and testing
+  </Card>
+  <Card title="JSON File" icon="file" href="/databases/json">
+    Simple file-based persistence for small applications
+  </Card>
+  <Card title="MongoDB" icon="leaf" href="/databases/mongodb">
+    NoSQL database for flexible, scalable storage
+  </Card>
+  <Card title="MySQL" icon="database" href="/databases/mysql">
+    Relational database with robust transaction support
+  </Card>
+  <Card title="PostgreSQL" icon="database" href="/databases/postgresql">
+    Advanced relational database with rich features
+  </Card>
+</CardGroup>
+
+## Choosing a Database
+
+### MemoryDB
+Best for:
+- Local development
+- Testing
+- Proof of concepts
+- Stateless bots (no persistence needed)
+
+**Limitations**: All data is lost when the bot restarts.
+
+### JSON File Database
+Best for:
+- Small bots with low traffic
+- Single-server deployments
+- Simple projects without database infrastructure
+
+**Limitations**: Not suitable for high-concurrency or multi-server setups.
+
+### MongoDB
+Best for:
+- Flexible schema requirements
+- Horizontal scaling
+- Document-oriented data
+- Cloud deployments (MongoDB Atlas)
+
+### MySQL
+Best for:
+- Traditional relational data models
+- Existing MySQL infrastructure
+- ACID transaction requirements
+- Well-established hosting options
+
+### PostgreSQL
+Best for:
+- Advanced SQL features
+- Complex queries and relationships
+- Contact management with custom fields
+- High-performance production environments
+
+## Common Interface
+
+All database adapters extend the base `MemoryDB` class and implement these core methods:
+
+```typescript
+interface DatabaseAdapter {
+  // Get the last conversation state for a phone number
+  getPrevByNumber(from: string): Promise<HistoryEntry | undefined>
+  
+  // Save a new conversation entry
+  save(ctx: HistoryEntry): Promise<void>
+}
+```
+
+## Data Schema
+
+Conversation history entries contain:
+
+<ResponseField name="ref" type="string" required>
+  Reference to the flow
+</ResponseField>
+
+<ResponseField name="keyword" type="string">
+  Trigger keyword that initiated the flow
+</ResponseField>
+
+<ResponseField name="answer" type="string" required>
+  The user's response or message content
+</ResponseField>
+
+<ResponseField name="refSerialize" type="string" required>
+  Serialized flow reference for state management
+</ResponseField>
+
+<ResponseField name="from" type="string" required>
+  Phone number or user identifier
+</ResponseField>
+
+<ResponseField name="options" type="object">
+  Additional metadata and flow options
+</ResponseField>
+
+## Switching Adapters
+
+Switching between adapters is straightforward - just change the import and initialization:
+
+<CodeGroup>
+```typescript Memory
+import { MemoryDB as Database } from '@builderbot/bot'
+
+const adapterDB = new Database()
+```
+
+```typescript JSON
+import { JsonFileDB as Database } from '@builderbot/database-json'
+
+const adapterDB = new Database({ filename: 'db.json' })
+```
+
+```typescript MongoDB
+import { MongoAdapter as Database } from '@builderbot/database-mongo'
+
+const adapterDB = new Database({
+  dbUri: process.env.MONGO_DB_URI,
+  dbName: process.env.MONGO_DB_NAME
+})
+```
+
+```typescript MySQL
+import { MysqlAdapter as Database } from '@builderbot/database-mysql'
+
+const adapterDB = new Database({
+  host: process.env.MYSQL_DB_HOST,
+  user: process.env.MYSQL_DB_USER,
+  database: process.env.MYSQL_DB_NAME,
+  password: process.env.MYSQL_DB_PASSWORD,
+  port: 3306
+})
+```
+
+```typescript PostgreSQL
+import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
+
+const adapterDB = new Database({
+  host: process.env.POSTGRES_DB_HOST,
+  user: process.env.POSTGRES_DB_USER,
+  database: process.env.POSTGRES_DB_NAME,
+  password: process.env.POSTGRES_DB_PASSWORD,
+  port: 5432
+})
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Set up your first bot with a database
+  </Card>
+  <Card title="Environment Variables" icon="key" href="/deployment/environment">
+    Configure database credentials securely
+  </Card>
+</CardGroup>

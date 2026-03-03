@@ -1,0 +1,123 @@
+---
+title: CLI Overview
+description: Introduction to BuilderBot CLI tools and installation guide
+---
+
+The BuilderBot CLI provides powerful command-line tools to quickly scaffold and manage WhatsApp chatbot projects. With interactive prompts and flexible configuration options, you can create production-ready bots in seconds.
+
+## Installation
+
+### Quick Start
+
+The fastest way to create a new BuilderBot project is using npm's create command:
+
+```bash
+npm create builderbot@latest
+```
+
+This will launch an interactive setup wizard that guides you through:
+- Selecting a WhatsApp provider
+- Choosing a database backend
+- Picking your preferred language (TypeScript or JavaScript)
+
+### Alternative Installation Methods
+
+You can also install the CLI globally to access the `bot` command:
+
+```bash
+npm install -g @builderbot/cli
+```
+
+Or use it directly with npx:
+
+```bash
+npx @builderbot/cli
+```
+
+## System Requirements
+
+Before using the BuilderBot CLI, ensure your system meets these requirements:
+
+### Node.js Version
+
+- **Node.js 20 or higher** is required
+- The CLI will automatically check your Node.js version during setup
+
+### Git Installation
+
+- **Git** must be installed on your system
+- Used for initializing project repositories and version control
+
+### Supported Operating Systems
+
+- Linux
+- macOS
+- Windows
+
+## What Gets Created
+
+When you create a new BuilderBot project, the CLI scaffolds a complete application with:
+
+- Pre-configured project structure
+- Provider-specific integration code
+- Database connection setup
+- Example conversation flows
+- Development and production scripts
+- Environment configuration files
+- Git repository initialization
+
+## Available Providers
+
+The CLI supports multiple WhatsApp providers and communication channels:
+
+### WhatsApp Providers (Open Source)
+
+- **Baileys** - Pure TypeScript WhatsApp library
+- **Sherpa** - Lightweight WhatsApp integration
+- **Evolution API** - RESTful WhatsApp API
+- **WPPConnect** - Browser-based WhatsApp automation
+
+### Commercial Providers
+
+- **Twilio** - Enterprise messaging platform
+- **Meta** - Official WhatsApp Business API
+
+### Other Channels
+
+- **Facebook Messenger** - Facebook messaging integration
+- **Instagram** - Instagram direct messages
+- **GoHighLevel** - Marketing automation platform
+- **Email** - IMAP/SMTP email integration
+
+## Database Options
+
+Choose from multiple database backends:
+
+- **Memory** - In-memory storage (development only)
+- **JSON** - File-based JSON storage
+- **MongoDB** - NoSQL document database
+- **MySQL** - Relational database
+- **PostgreSQL** - Advanced relational database
+
+## Language Support
+
+- **TypeScript** - Full type safety and modern features
+- **JavaScript** - Classic Node.js development
+
+## Next Steps
+
+After installation:
+
+1. Navigate to your project directory
+2. Install dependencies with `npm install`
+3. Start development with `npm run dev` (TypeScript) or `npm start` (JavaScript)
+4. Explore the [documentation](https://builderbot.app) for advanced features
+
+## Getting Help
+
+Need assistance?
+
+- Visit the [official documentation](https://builderbot.app)
+- Join the [Discord community](https://link.codigoencasa.com/DISCORD)
+- Report issues on [GitHub](https://github.com/codigoencasa/bot-whatsapp)
+- Follow on [Twitter/X](https://twitter.com/leifermendez)

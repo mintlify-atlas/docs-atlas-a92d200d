@@ -1,0 +1,483 @@
+---
+title: 'Dialogflow CX Integration'
+description: 'Integrate Google Dialogflow CX with BuilderBot for advanced conversational AI'
+icon: 'google'
+---
+
+# Dialogflow CX Integration
+
+Integrate Google Dialogflow CX with BuilderBot for advanced conversational AI with visual flow builders, version control, and enterprise features.
+
+<Info>
+  Dialogflow CX is the advanced version of Dialogflow with visual flow builders, better state management, and enterprise capabilities. Use [Dialogflow ES](/integrations/dialogflow) for simpler use cases.
+</Info>
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    Install the Dialogflow CX context package:
+
+    <CodeGroup>
+    ```bash npm
+    npm install @builderbot/contexts-dialogflow-cx
+    ```
+
+    ```bash pnpm
+    pnpm add @builderbot/contexts-dialogflow-cx
+    ```
+
+    ```bash yarn
+    yarn add @builderbot/contexts-dialogflow-cx
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install Google Cloud dependencies">
+    The package requires Google Cloud Dialogflow CX SDK:
+
+    ```bash
+    npm install @google-cloud/dialogflow-cx
+    ```
+
+    <Note>
+      This dependency is included automatically when you install `@builderbot/contexts-dialogflow-cx`
+    </Note>
+  </Step>
+
+  <Step title="Get Google Cloud credentials">
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create or select a project
+    3. Enable the Dialogflow CX API
+    4. Create a service account with Dialogflow API Admin role
+    5. Download the JSON key file
+    6. Save it as `google-key.json` in your project root
+  </Step>
+
+  <Step title="Get CX Agent Details">
+    From your Dialogflow CX console, note:
+    - **Agent ID**: Found in agent settings
+    - **Location**: Region where your agent is deployed (e.g., 'us-central1', 'europe-west1')
+  </Step>
+</Steps>
+
+## Configuration
+
+### Setup Google Credentials
+
+Place your `google-key.json` file in your project root directory:
+
+```json google-key.json
+{
+  "type": "service_account",
+  "project_id": "your-project-id",
+  "private_key_id": "key-id",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "client_email": "your-service-account@your-project.iam.gserviceaccount.com",
+  "client_id": "123456789",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/..."
+}
+```
+
+<Warning>
+  Never commit `google-key.json` to version control. Add it to your `.gitignore` file.
+</Warning>
+
+### Initialize Dialogflow CX Context
+
+<CodeGroup>
+```javascript app.js
+const { createBot, createProvider, createFlow } = require('@builderbot/bot')
+const { DialogFlowContextCX } = require('@builderbot/contexts-dialogflow-cx')
+const { MemoryDB } = require('@builderbot/bot')
+const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+const main = async () => {
+  const adapterFlow = createFlow([])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  // Initialize Dialogflow CX
+  const dialogflowCX = new DialogFlowContextCX(
+    adapterDB,
+    adapterProvider,
+    {
+      language: 'es',
+      location: 'us-central1',
+      agentId: 'your-agent-id-here'
+    }
+  )
+
+  const bot = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+
+```typescript app.ts
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { DialogFlowContextCX } from '@builderbot/contexts-dialogflow-cx'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterFlow = createFlow([])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  // Initialize Dialogflow CX
+  const dialogflowCX = new DialogFlowContextCX(
+    adapterDB,
+    adapterProvider,
+    {
+      language: 'es',
+      location: 'us-central1',
+      agentId: 'your-agent-id-here'
+    }
+  )
+
+  const bot = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+</CodeGroup>
+
+## Configuration Options
+
+<ParamField path="language" type="string" default="es" required>
+  Language code for Dialogflow CX agent (e.g., 'en', 'es', 'fr', 'pt')
+</ParamField>
+
+<ParamField path="location" type="string" required>
+  Google Cloud region where your CX agent is deployed
+  
+  Common locations:
+  - `us-central1` - Iowa, USA
+  - `us-east1` - South Carolina, USA
+  - `europe-west1` - Belgium
+  - `asia-northeast1` - Tokyo, Japan
+</ParamField>
+
+<ParamField path="agentId" type="string" required>
+  Your Dialogflow CX agent ID (found in agent settings)
+</ParamField>
+
+## Usage
+
+### Handle Messages with Dialogflow CX
+
+Process incoming messages through Dialogflow CX:
+
+```javascript
+const aiFlow = addKeyword(['.*'], { regex: true })
+  .addAction(async (ctx) => {
+    await dialogflowCX.handleMsg({
+      from: ctx.from,
+      body: ctx.body
+    })
+  })
+```
+
+### Complete Example with Flows
+
+<CodeGroup>
+```javascript complete-example.js
+const { createBot, createProvider, createFlow, addKeyword } = require('@builderbot/bot')
+const { DialogFlowContextCX } = require('@builderbot/contexts-dialogflow-cx')
+const { MemoryDB } = require('@builderbot/bot')
+const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+const main = async () => {
+  const adapterDB = new MemoryDB()
+  const adapterProvider = createProvider(BaileysProvider)
+
+  // Initialize Dialogflow CX
+  const dialogflowCX = new DialogFlowContextCX(
+    adapterDB,
+    adapterProvider,
+    {
+      language: 'en',
+      location: 'us-central1',
+      agentId: 'abc123-def456-ghi789'
+    }
+  )
+
+  // Catch-all flow for AI responses
+  const aiFlow = addKeyword(['.*'], { regex: true })
+    .addAction(async (ctx) => {
+      await dialogflowCX.handleMsg({
+        from: ctx.from,
+        body: ctx.body
+      })
+    })
+
+  const adapterFlow = createFlow([aiFlow])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  console.log('Bot with Dialogflow CX ready!')
+}
+
+main()
+```
+
+```typescript complete-example.ts
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { DialogFlowContextCX } from '@builderbot/contexts-dialogflow-cx'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import type { DialogFlowCXContextOptions } from '@builderbot/contexts-dialogflow-cx'
+
+const main = async () => {
+  const adapterDB = new MemoryDB()
+  const adapterProvider = createProvider(BaileysProvider)
+
+  const cxOptions: DialogFlowCXContextOptions = {
+    language: 'en',
+    location: 'us-central1',
+    agentId: 'abc123-def456-ghi789'
+  }
+
+  // Initialize Dialogflow CX
+  const dialogflowCX = new DialogFlowContextCX(
+    adapterDB,
+    adapterProvider,
+    cxOptions
+  )
+
+  // Catch-all flow for AI responses
+  const aiFlow = addKeyword(['.*'], { regex: true })
+    .addAction(async (ctx) => {
+      await dialogflowCX.handleMsg({
+        from: ctx.from,
+        body: ctx.body
+      })
+    })
+
+  const adapterFlow = createFlow([aiFlow])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  console.log('Bot with Dialogflow CX ready!')
+}
+
+main()
+```
+</CodeGroup>
+
+## Response Types
+
+Dialogflow CX can send different types of responses:
+
+### Text Responses
+
+Simple text messages from pages and flows:
+
+```javascript
+// Dialogflow CX returns text response
+// BuilderBot automatically sends: "Welcome to our service!"
+```
+
+### Rich Media Responses (Custom Payloads)
+
+Send images, buttons, and interactive content using custom payloads:
+
+```json Dialogflow CX Custom Payload
+{
+  "answer": "Choose an option",
+  "media": "https://example.com/menu.jpg",
+  "buttons": [
+    { "body": "Option 1" },
+    { "body": "Option 2" },
+    { "body": "Option 3" }
+  ]
+}
+```
+
+The context automatically processes these payloads and sends rich messages through BuilderBot.
+
+## Advanced Features
+
+### Session Parameters
+
+Dialogflow CX maintains session parameters across the conversation flow:
+
+```javascript
+// CX automatically tracks:
+// - Current page
+// - Session parameters
+// - Intent history
+// - Entity values
+```
+
+### Multi-turn Conversations
+
+CX excels at complex, multi-turn conversations with state management:
+
+```
+User: I want to book a flight
+Bot: Where would you like to go?
+User: New York
+Bot: When would you like to travel?
+User: Next Monday
+Bot: Great! I found flights to New York on Monday...
+```
+
+### Page Transitions
+
+Dialogflow CX uses pages to manage conversation states. The context automatically handles page transitions and state changes.
+
+## Session Management
+
+Dialogflow CX Context automatically manages user sessions:
+
+- Each user gets a unique session based on their phone number (`from` field)
+- Sessions maintain full conversation state
+- Page context and parameters are preserved
+- Flow transitions are handled automatically
+
+## TypeScript Support
+
+Full TypeScript definitions included:
+
+```typescript
+import type { 
+  DialogFlowCXContextOptions,
+  DialogFlowCredentials,
+  MessageContextIncoming,
+  DialogResponseMessage 
+} from '@builderbot/contexts-dialogflow-cx'
+
+const options: DialogFlowCXContextOptions = {
+  language: 'en',
+  location: 'us-central1',
+  agentId: 'your-agent-id'
+}
+
+const message: MessageContextIncoming = {
+  from: '1234567890',
+  body: 'Hello',
+  ref: 'optional-reference'
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Agent Configuration">
+    - Design your CX flows in the visual builder first
+    - Test flows thoroughly in the Dialogflow CX simulator
+    - Use pages to organize complex conversation logic
+    - Set appropriate session timeouts
+  </Accordion>
+
+  <Accordion title="Location Selection">
+    - Choose a location close to your users for better latency
+    - Ensure data residency requirements are met
+    - Note: `location` must match where your CX agent is deployed
+  </Accordion>
+
+  <Accordion title="Security">
+    - Never commit `google-key.json` to version control
+    - Use environment variables for production
+    - Restrict service account to minimum required permissions
+    - Rotate service account keys regularly
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    - Implement fallback responses in CX
+    - Monitor API quotas and usage
+    - Add logging for debugging
+    - Handle network errors gracefully
+  </Accordion>
+
+  <Accordion title="Performance">
+    - Cache frequently accessed data
+    - Monitor response times
+    - Use webhooks for external data when needed
+    - Optimize flow complexity
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Error: "No se encontró google-key.json"
+
+Ensure your credentials file exists in the project root:
+
+```bash
+ls google-key.json
+```
+
+### API Endpoint Errors
+
+Verify your `location` matches your agent deployment:
+
+```javascript
+// If agent is in Europe, use:
+location: 'europe-west1'
+
+// API endpoint will be: europe-west1-dialogflow.googleapis.com
+```
+
+### Agent ID Issues
+
+Get your agent ID from Dialogflow CX Console:
+1. Open your agent
+2. Go to Agent Settings
+3. Copy the Agent ID (long UUID format)
+
+### Session Path Errors
+
+The session path format for CX is:
+```
+projects/{project}/locations/{location}/agents/{agent}/sessions/{session}
+```
+
+This is automatically constructed using:
+- `project_id` from credentials
+- `location` from options
+- `agentId` from options  
+- `from` field as session ID
+
+## Dialogflow ES vs CX
+
+| Feature | Dialogflow ES | Dialogflow CX |
+|---------|---------------|---------------|
+| Visual Flow Builder | Limited | Advanced |
+| State Management | Basic contexts | Pages & flows |
+| Version Control | Basic | Built-in |
+| Pricing | Lower | Higher |
+| Complexity | Simple bots | Enterprise apps |
+| Package | `@builderbot/contexts-dialogflow` | `@builderbot/contexts-dialogflow-cx` |
+
+<Tip>
+  Start with [Dialogflow ES](/integrations/dialogflow) for simple use cases. Upgrade to CX when you need advanced flow management and enterprise features.
+</Tip>
+
+## Related Resources
+
+- [Dialogflow CX Documentation](https://cloud.google.com/dialogflow/cx/docs)
+- [Google Cloud Console](https://console.cloud.google.com/)
+- [Dialogflow ES Integration](/integrations/dialogflow)
+- [CX Best Practices](https://cloud.google.com/dialogflow/cx/docs/concept/best-practices)

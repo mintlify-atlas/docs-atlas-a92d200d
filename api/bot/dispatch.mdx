@@ -1,0 +1,193 @@
+---
+title: dispatch
+description: Trigger flows programmatically outside of normal conversation flow
+---
+
+The `dispatch` method allows you to programmatically trigger flows for specific users. This is useful when you want to initiate a conversation flow from external sources like HTTP endpoints, webhooks, or scheduled tasks.
+
+## Method Signature
+
+```typescript
+dispatch(
+  customName: string,
+  payload: {
+    from: string
+    name: string
+    [key: string]: any
+  }
+): any
+```
+
+<ParamField path="customName" type="string" required>
+  The name of the custom event to trigger. This should match an event defined with `utils.setEvent()` in your flow
+</ParamField>
+
+<ParamField path="payload" type="object" required>
+  The payload object containing user information and additional data
+  
+  <Expandable title="properties">
+    <ParamField path="from" type="string" required>
+      The user identifier (phone number for WhatsApp, user ID for other platforms)
+    </ParamField>
+    
+    <ParamField path="name" type="string" required>
+      The user's name or identifier for the conversation
+    </ParamField>
+    
+    <ParamField path="[key: string]" type="any">
+      Any additional custom properties you want to pass to the flow
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="any">
+  Returns the result of triggering the flow
+</ResponseField>
+
+## Usage Examples
+
+### Basic Flow Dispatch
+
+First, create a flow with a custom event:
+
+```typescript
+import { addKeyword, utils } from '@builderbot/bot'
+
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+  .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+    await state.update({ name: ctx.body })
+  })
+  .addAnswer('What is your age?', { capture: true }, async (ctx, { state }) => {
+    await state.update({ age: ctx.body })
+  })
+  .addAction(async (_, { flowDynamic, state }) => {
+    await flowDynamic(
+      `${state.get('name')}, thanks for your information! Your age: ${state.get('age')}`
+    )
+  })
+```
+
+Then dispatch the flow from an HTTP endpoint:
+
+```typescript
+adapterProvider.server.post(
+  '/v1/register',
+  handleCtx(async (bot, req, res) => {
+    const { number, name } = req.body
+    await bot.dispatch('REGISTER_FLOW', { 
+      from: number, 
+      name 
+    })
+    return res.end('triggered')
+  })
+)
+```
+
+### Dispatch with Custom Data
+
+```typescript
+// Define flow
+const welcomeFlow = addKeyword(utils.setEvent('WELCOME_NEW_USER'))
+  .addAction(async (ctx, { flowDynamic }) => {
+    const { name, plan, referralCode } = ctx
+    await flowDynamic([
+      `Welcome ${name}! 🎉`,
+      `You've signed up for the ${plan} plan.`,
+      referralCode ? `Referral code: ${referralCode}` : ''
+    ].filter(Boolean))
+  })
+
+// Dispatch with custom data
+await bot.dispatch('WELCOME_NEW_USER', {
+  from: '1234567890',
+  name: 'John Doe',
+  plan: 'Premium',
+  referralCode: 'REF123'
+})
+```
+
+### Multiple Event Dispatches
+
+```typescript
+// Samples flow
+const samplesFlow = addKeyword(utils.setEvent('SAMPLES'))
+  .addAnswer('💪 I\'ll send you a lot of files...')
+  .addAnswer('Send image from Local', { 
+    media: join(process.cwd(), 'assets', 'sample.png') 
+  })
+  .addAnswer('Send video from URL', {
+    media: 'https://example.com/video.mp4'
+  })
+
+// Dispatch endpoint
+adapterProvider.server.post(
+  '/v1/samples',
+  handleCtx(async (bot, req, res) => {
+    const { number, name } = req.body
+    await bot.dispatch('SAMPLES', { 
+      from: number, 
+      name 
+    })
+    return res.end('triggered')
+  })
+)
+```
+
+### Webhook Integration Example
+
+```typescript
+// Flow for new payment notifications
+const paymentFlow = addKeyword(utils.setEvent('PAYMENT_RECEIVED'))
+  .addAction(async (ctx, { flowDynamic }) => {
+    const { amount, orderId } = ctx
+    await flowDynamic([
+      `Payment received! 💳`,
+      `Amount: $${amount}`,
+      `Order ID: ${orderId}`,
+      `Thank you for your purchase!`
+    ])
+  })
+
+// Webhook endpoint
+adapterProvider.server.post(
+  '/webhook/payment',
+  handleCtx(async (bot, req, res) => {
+    const { userId, amount, orderId } = req.body
+    
+    await bot.dispatch('PAYMENT_RECEIVED', {
+      from: userId,
+      name: 'Customer',
+      amount,
+      orderId
+    })
+    
+    return res.end('processed')
+  })
+)
+```
+
+## Important Notes
+
+- The `dispatch` method is only available on the `bot` object in HTTP endpoints
+- The event name must match exactly with the event defined using `utils.setEvent()`
+- All custom data in the payload will be available in the flow's `ctx` object
+- The `from` field is required and identifies which user the flow will run for
+- The flow will execute asynchronously for the specified user
+
+## Common Use Cases
+
+1. **Webhook integrations** - Trigger flows when external events occur (payments, orders, etc.)
+2. **Scheduled notifications** - Start flows at specific times or intervals
+3. **User onboarding** - Initiate registration flows from your website/app
+4. **Event-driven messaging** - Send targeted messages based on user actions in other systems
+
+## Related Methods
+
+- [sendMessage](/api/bot/send-message) - Send direct messages to users
+- [utils.setEvent](/api/utils/set-event) - Define custom events for flows
+- [gotoFlow](/api/methods/goto-flow) - Navigate between flows
+
+## See Also
+
+- [HTTP Server](/guides/http-server) - Learn about creating HTTP endpoints
+- [Custom Events](/guides/custom-events) - Working with custom events

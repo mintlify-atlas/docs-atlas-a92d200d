@@ -1,0 +1,305 @@
+---
+title: Creating Conversation Flows
+description: Learn how to build conversation flows with addKeyword and addAnswer
+---
+
+Conversation flows are the heart of your BuilderBot. This guide shows you how to create interactive conversations using keywords, answers, and flow control.
+
+## Basic Flow Structure
+
+Every flow starts with a keyword trigger and builds from there:
+
+```javascript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello', 'hola'])
+    .addAnswer('🙌 Hello welcome to this *Chatbot*')
+    .addAnswer('How can I help you today?')
+```
+
+## Understanding Flow Components
+
+<Steps>
+  <Step title="addKeyword - Define triggers">
+    Use `addKeyword()` to specify words or phrases that start a flow:
+
+    ```javascript
+    // Single keyword
+    const helpFlow = addKeyword('help')
+
+    // Multiple keywords
+    const greetFlow = addKeyword(['hi', 'hello', 'hey'])
+
+    // Case-sensitive matching
+    const sensitiveFlow = addKeyword('URGENT', { sensitive: true })
+
+    // Regex pattern matching
+    const regexFlow = addKeyword(/^order-\d+$/i, { regex: true })
+    ```
+  </Step>
+
+  <Step title="addAnswer - Send messages">
+    Chain `.addAnswer()` to send responses:
+
+    ```javascript
+    const flow = addKeyword('menu')
+        .addAnswer('Here are our options:')
+        .addAnswer(['1. Sales', '2. Support', '3. Billing'].join('\n'))
+        .addAnswer('Please select a number')
+    ```
+  </Step>
+
+  <Step title="addAction - Execute logic">
+    Use `.addAction()` to run code without sending a message:
+
+    ```javascript
+    const flow = addKeyword('register')
+        .addAnswer('Starting registration...')
+        .addAction(async (ctx, { flowDynamic, state }) => {
+            // Your custom logic here
+            const userData = await fetchUserData(ctx.from)
+            await state.update({ userData })
+            await flowDynamic(`Welcome back, ${userData.name}!`)
+        })
+    ```
+  </Step>
+</Steps>
+
+## Capturing User Input
+
+Capture user responses using the `capture` option:
+
+```javascript
+const registerFlow = addKeyword('register')
+    .addAnswer(
+        'What is your name?', 
+        { capture: true }, 
+        async (ctx, { state }) => {
+            await state.update({ name: ctx.body })
+        }
+    )
+    .addAnswer(
+        'What is your age?', 
+        { capture: true }, 
+        async (ctx, { state }) => {
+            await state.update({ age: ctx.body })
+        }
+    )
+    .addAction(async (ctx, { flowDynamic, state }) => {
+        const name = state.get('name')
+        const age = state.get('age')
+        await flowDynamic(`Thanks ${name}! You are ${age} years old.`)
+    })
+```
+
+<Note>
+  When `capture: true`, the callback function receives the user's message in `ctx.body`
+</Note>
+
+## Flow Control Methods
+
+Control conversation flow with these methods available in callbacks:
+
+### gotoFlow
+
+Redirect to another flow:
+
+```javascript
+const discordFlow = addKeyword('doc')
+    .addAnswer(
+        'Do you want to continue? *yes*',
+        { capture: true },
+        async (ctx, { gotoFlow }) => {
+            if (ctx.body.toLowerCase().includes('yes')) {
+                return gotoFlow(registerFlow)
+            }
+        }
+    )
+```
+
+<Note>
+  Use `require()` for flows to avoid circular dependency issues:
+  ```javascript
+  gotoFlow(require('./flows/registerFlow.js'))
+  ```
+</Note>
+
+### fallBack
+
+Repeat the previous message when input is invalid:
+
+```javascript
+const welcomeFlow = addKeyword(['hello'])
+    .addAnswer(
+        'Type *doc* to see documentation',
+        { capture: true },
+        async (ctx, { fallBack }) => {
+            if (!ctx.body.toLowerCase().includes('doc')) {
+                return fallBack('You should type *doc*')
+            }
+        }
+    )
+```
+
+### flowDynamic
+
+Send dynamic messages based on logic:
+
+```javascript
+const menuFlow = addKeyword('menu')
+    .addAction(async (ctx, { flowDynamic }) => {
+        const options = await getMenuOptions() // Your async function
+        await flowDynamic(options.map(o => `- ${o.name}`).join('\n'))
+    })
+```
+
+### endFlow
+
+Stop the conversation flow:
+
+```javascript
+const cancelFlow = addKeyword('cancel')
+    .addAction(async (ctx, { endFlow }) => {
+        await endFlow('Operation cancelled. Type *help* to start again.')
+    })
+```
+
+## Nested Flows
+
+Create sub-flows that are only accessible from a parent flow:
+
+```javascript
+const salesFlow = addKeyword('sales')
+    .addAnswer('Welcome to sales!')
+
+const supportFlow = addKeyword('support')
+    .addAnswer('Welcome to support!')
+
+const menuFlow = addKeyword('menu')
+    .addAnswer(
+        ['Choose an option:', '1. Sales', '2. Support'].join('\n'),
+        { capture: true },
+        null,
+        [salesFlow, supportFlow] // Nested flows
+    )
+```
+
+## Event-Based Flows
+
+Trigger flows programmatically using events:
+
+```javascript
+import { addKeyword, utils } from '@builderbot/bot'
+
+// Create a flow triggered by custom event
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+    .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ name: ctx.body })
+    })
+
+// Trigger from an HTTP endpoint
+adapterProvider.server.post('/v1/register',
+    handleCtx(async (bot, req, res) => {
+        const { number } = req.body
+        await bot.dispatch('REGISTER_FLOW', { from: number })
+        return res.end('triggered')
+    })
+)
+```
+
+## Adding Delays
+
+Add natural pauses between messages:
+
+```javascript
+const flow = addKeyword('hello')
+    .addAnswer('Hello!', { delay: 1000 }) // 1 second delay
+    .addAnswer('How are you?', { delay: 2000 }) // 2 second delay
+    .addAnswer('I can help you today!')
+```
+
+## Complete Example
+
+Here's a complete flow combining multiple concepts:
+
+```javascript
+import { addKeyword, createFlow } from '@builderbot/bot'
+
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+    .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ name: ctx.body })
+    })
+    .addAnswer('What is your age?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ age: ctx.body })
+    })
+    .addAction(async (_, { flowDynamic, state }) => {
+        await flowDynamic(`${state.get('name')}, thanks for your info!`)
+    })
+
+const docFlow = addKeyword('doc')
+    .addAnswer(
+        ['Documentation: https://builderbot.app/docs', 'Continue? *yes*'].join('\n'),
+        { capture: true },
+        async (ctx, { gotoFlow, flowDynamic }) => {
+            if (ctx.body.toLowerCase().includes('yes')) {
+                return gotoFlow(registerFlow)
+            }
+            await flowDynamic('Thanks!')
+        }
+    )
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+    .addAnswer('🙌 Hello welcome!')
+    .addAnswer(
+        'Type *doc* to view documentation',
+        { delay: 800, capture: true },
+        async (ctx, { fallBack }) => {
+            if (!ctx.body.toLowerCase().includes('doc')) {
+                return fallBack('You should type *doc*')
+            }
+        },
+        [docFlow]
+    )
+
+// Export all flows
+const adapterFlow = createFlow([welcomeFlow, registerFlow, docFlow])
+```
+
+## Best Practices
+
+<Accordion title="Keep flows focused">
+  Each flow should handle one specific task or conversation topic. Break complex interactions into multiple smaller flows.
+</Accordion>
+
+<Accordion title="Use descriptive flow names">
+  Name flows based on their purpose: `registerFlow`, `paymentFlow`, `supportFlow`
+</Accordion>
+
+<Accordion title="Handle edge cases">
+  Always validate user input and provide helpful fallback messages:
+  ```javascript
+  .addAnswer('Enter a number 1-3', { capture: true }, async (ctx, { fallBack }) => {
+      const num = parseInt(ctx.body)
+      if (isNaN(num) || num < 1 || num > 3) {
+          return fallBack('Please enter a valid number between 1 and 3')
+      }
+  })
+  ```
+</Accordion>
+
+<Accordion title="Provide exit options">
+  Let users exit or cancel flows easily:
+  ```javascript
+  .addAnswer('Type *cancel* anytime to stop', { capture: true }, async (ctx, { endFlow }) => {
+      if (ctx.body.toLowerCase() === 'cancel') {
+          return endFlow('Cancelled. Type *help* to restart.')
+      }
+  })
+  ```
+</Accordion>
+
+## Next Steps
+
+- Learn about [State Management](/guides/state-management) to store user data
+- Explore [Handling Media](/guides/handling-media) to send files and images
+- Understand the [Queue System](/guides/queue-system) for message ordering

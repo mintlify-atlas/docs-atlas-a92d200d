@@ -1,0 +1,358 @@
+---
+title: State Management
+description: Manage user-specific and global state in your bot
+---
+
+BuilderBot provides two types of state management: **user-specific state** for individual conversations and **global state** shared across all users.
+
+## User State
+
+User state is scoped to individual conversations and allows you to store data specific to each user.
+
+### Type Definition
+
+```typescript
+type BotStateStandAlone = {
+  update: (props: { [key: string]: any }) => Promise<void>
+  getMyState: <K = any>() => { [key: string]: K }
+  get: <K = any>(prop: string) => K
+  clear: () => void
+}
+```
+
+## State Methods
+
+### update()
+
+Update the state with new values.
+
+```typescript
+update(props: { [key: string]: any }): Promise<void>
+```
+
+<ParamField path="props" type="object" required>
+  Object containing key-value pairs to update in the state
+</ParamField>
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when the state is updated
+</ResponseField>
+
+**Examples:**
+
+```typescript
+// Single value
+await state.update({ name: 'John' })
+
+// Multiple values
+await state.update({ 
+  name: 'John', 
+  age: 25, 
+  email: 'john@example.com' 
+})
+
+// Nested objects
+await state.update({ 
+  user: { 
+    name: 'John', 
+    preferences: { theme: 'dark' } 
+  } 
+})
+```
+
+### get()
+
+Retrieve a specific value from the state.
+
+```typescript
+get<K = any>(prop: string): K
+```
+
+<ParamField path="prop" type="string" required>
+  The property name to retrieve. Supports dot notation for nested properties
+</ParamField>
+
+<ResponseField name="return" type="K">
+  Returns the value of the property, or `undefined` if not found
+</ResponseField>
+
+**Examples:**
+
+```typescript
+// Get simple value
+const name = state.get('name') // 'John'
+
+// Get nested value with dot notation
+const theme = state.get('user.preferences.theme') // 'dark'
+
+// Value doesn't exist
+const missing = state.get('nonexistent') // undefined
+```
+
+### getMyState()
+
+Get the entire state object for the current user.
+
+```typescript
+getMyState<K = any>(): { [key: string]: K }
+```
+
+<ResponseField name="return" type="object">
+  Returns the complete state object, or `undefined` if no state exists
+</ResponseField>
+
+**Examples:**
+
+```typescript
+const allState = state.getMyState()
+console.log(allState)
+// { name: 'John', age: 25, email: 'john@example.com' }
+```
+
+### clear()
+
+Clear all state for the current user.
+
+```typescript
+clear(): void
+```
+
+<ResponseField name="return" type="void">
+  Returns nothing
+</ResponseField>
+
+**Examples:**
+
+```typescript
+state.clear()
+const allState = state.getMyState() // undefined
+```
+
+## Global State
+
+Global state is shared across all users and conversations.
+
+### Type Definition
+
+```typescript
+type BotStateGlobal = {
+  update: (props: { [key: string]: any }) => Promise<void>
+  get: <K = any>(prop: string) => K
+  getAllState: () => { [key: string]: any }
+  clear: () => void
+}
+```
+
+### Global State Methods
+
+Global state has the same methods as user state, except:
+
+- `getAllState()` instead of `getMyState()` - returns the complete global state
+- No user-specific scoping - all changes affect all users
+
+## Usage Examples
+
+### User Registration Flow
+
+```typescript
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+  .addAnswer(
+    'What is your name?', 
+    { capture: true }, 
+    async (ctx, { state }) => {
+      await state.update({ name: ctx.body })
+    }
+  )
+  .addAnswer(
+    'What is your age?', 
+    { capture: true }, 
+    async (ctx, { state }) => {
+      await state.update({ age: ctx.body })
+    }
+  )
+  .addAction(async (_, { flowDynamic, state }) => {
+    const name = state.get('name')
+    const age = state.get('age')
+    await flowDynamic(`${name}, thanks for your information! Your age: ${age}`)
+  })
+```
+
+### Shopping Cart Example
+
+```typescript
+const addToCartFlow = addKeyword('add to cart')
+  .addAnswer(
+    'What product would you like to add?',
+    { capture: true },
+    async (ctx, { state }) => {
+      const cart = state.get('cart') || []
+      cart.push({ 
+        product: ctx.body, 
+        timestamp: Date.now() 
+      })
+      await state.update({ cart })
+    }
+  )
+  .addAction(async (_, { flowDynamic, state }) => {
+    const cart = state.get('cart')
+    await flowDynamic(`You have ${cart.length} items in your cart`)
+  })
+
+const viewCartFlow = addKeyword('view cart')
+  .addAction(async (_, { flowDynamic, state }) => {
+    const cart = state.get('cart') || []
+    
+    if (cart.length === 0) {
+      await flowDynamic('Your cart is empty')
+      return
+    }
+    
+    const items = cart.map((item, i) => 
+      `${i + 1}. ${item.product}`
+    ).join('\n')
+    
+    await flowDynamic(`Your cart:\n${items}`)
+  })
+
+const clearCartFlow = addKeyword('clear cart')
+  .addAction(async (_, { flowDynamic, state }) => {
+    await state.update({ cart: [] })
+    await flowDynamic('Cart cleared!')
+  })
+```
+
+### Using Global State for Analytics
+
+```typescript
+const trackingFlow = addKeyword('*')
+  .addAction(async (ctx, { globalState }) => {
+    const totalMessages = globalState.get('totalMessages') || 0
+    const uniqueUsers = globalState.get('uniqueUsers') || new Set()
+    
+    uniqueUsers.add(ctx.from)
+    
+    await globalState.update({
+      totalMessages: totalMessages + 1,
+      uniqueUsers: Array.from(uniqueUsers)
+    })
+  })
+
+const statsFlow = addKeyword('stats')
+  .addAction(async (_, { flowDynamic, globalState }) => {
+    const total = globalState.get('totalMessages') || 0
+    const users = globalState.get('uniqueUsers') || []
+    
+    await flowDynamic([
+      `📊 Bot Statistics:`,
+      `Total messages: ${total}`,
+      `Unique users: ${users.length}`
+    ])
+  })
+```
+
+### HTTP Endpoint State Access
+
+```typescript
+adapterProvider.server.get(
+  '/v1/user/:number/state',
+  handleCtx(async (bot, req, res) => {
+    const { number } = req.params
+    const userState = bot.state(number).getMyState()
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    return res.end(JSON.stringify({ state: userState }))
+  })
+)
+
+adapterProvider.server.post(
+  '/v1/user/:number/state',
+  handleCtx(async (bot, req, res) => {
+    const { number } = req.params
+    const updates = req.body
+    
+    await bot.state(number).update(updates)
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    return res.end(JSON.stringify({ status: 'updated' }))
+  })
+)
+```
+
+### Session Management
+
+```typescript
+const loginFlow = addKeyword('login')
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    await state.update({ 
+      isAuthenticated: true,
+      loginTime: Date.now()
+    })
+    await flowDynamic('You are now logged in!')
+  })
+
+const protectedFlow = addKeyword('account')
+  .addAction(async (ctx, { state, flowDynamic, endFlow }) => {
+    const isAuth = state.get('isAuthenticated')
+    
+    if (!isAuth) {
+      await flowDynamic('Please login first')
+      return endFlow()
+    }
+    
+    await flowDynamic('Welcome to your account!')
+  })
+
+const logoutFlow = addKeyword('logout')
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    state.clear()
+    await flowDynamic('You have been logged out')
+  })
+```
+
+## Initial Global State
+
+You can set initial global state when creating the bot:
+
+```typescript
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: adapterProvider,
+  database: adapterDB,
+  globalState: {
+    botStartTime: Date.now(),
+    version: '1.0.0',
+    features: ['chat', 'media', 'buttons']
+  }
+})
+```
+
+## Important Notes
+
+### User State
+- Scoped to individual users (identified by `from` field)
+- Persists during the bot runtime
+- Lost when the bot restarts (unless persisted to database)
+- Perfect for conversation context and user preferences
+
+### Global State
+- Shared across all users
+- Useful for counters, analytics, and bot-wide settings
+- Also lost on restart unless persisted
+- Be careful with concurrent updates
+
+### Persistence
+Both state types are stored in memory by default. For persistent state:
+
+1. Save state to database periodically
+2. Load state from database on bot startup
+3. Use database triggers for critical data
+
+## Related Methods
+
+- [flowDynamic](/api/methods/flow-dynamic) - Send dynamic messages using state data
+- [blacklist](/api/bot/blacklist) - User access control
+
+## See Also
+
+- [Database Integration](/guides/database) - Persisting state
+- [HTTP Server](/guides/http-server) - Accessing state via HTTP

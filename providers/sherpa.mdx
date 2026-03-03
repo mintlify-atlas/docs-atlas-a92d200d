@@ -1,0 +1,85 @@
+---
+title: Sherpa Provider
+description: Sherpa messaging platform integration
+---
+
+The Sherpa provider integrates BuilderBot with the Sherpa messaging platform, enabling multi-channel communication capabilities.
+
+## Features
+
+- Multi-channel messaging
+- Text and media support
+- Webhook integration
+- API-based communication
+- Message tracking
+- Delivery reports
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-sherpa
+```
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { SherpaProvider } from '@builderbot/provider-sherpa'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(SherpaProvider, {
+  apiKey: 'YOUR_API_KEY',
+  apiUrl: 'https://api.sherpa.com',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Environment Variables
+
+```env
+SHERPA_API_KEY=your_api_key
+SHERPA_API_URL=https://api.sherpa.com
+PORT=3000
+```
+
+## Basic Usage
+
+### Sending Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to Sherpa')
+  .addAnswer('How can we help?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('media')
+  .addAnswer('Here is your file:', {
+    media: 'https://example.com/file.pdf'
+  })
+```
+
+## Webhook Configuration
+
+```
+POST /webhook - Receive messages
+```
+
+## Further Resources
+
+- [Sherpa Documentation](https://sherpa.com/docs)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

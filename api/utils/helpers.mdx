@@ -1,0 +1,319 @@
+---
+title: Utility Functions
+description: Helper functions for common tasks
+---
+
+BuilderBot provides utility functions for delays, downloads, blacklisting, and more.
+
+## Delay
+
+<ResponseField name="delay" type="function">
+  Introduces a delay in execution.
+  
+  **Parameters:**
+  - `milliseconds` (number): Duration of delay in milliseconds
+  
+  **Returns:** `Promise<void>`
+  
+  ```javascript
+  const { delay } = require('@builderbot/bot/utils')
+  
+  await delay(1000) // Wait 1 second
+  console.log('Executed after 1 second')
+  ```
+</ResponseField>
+
+## Blacklist Management
+
+<ResponseField name="BlackList" type="class">
+  Manages blocked phone numbers. Also supports whitelist mode.
+  
+  ### Constructor
+  
+  ```javascript
+  const { BlackList } = require('@builderbot/bot/utils')
+  const blacklist = new BlackList(['1234567890'])
+  ```
+  
+  **Parameters:**
+  - `initialNumbers` (string[]): Optional array of numbers to block initially
+  
+  ### Methods
+  
+  <Accordion title="add">
+    Add number(s) to the blacklist.
+    
+    **Parameters:**
+    - `phoneNumbers` (string | string[]): Phone number(s) to block
+    
+    **Returns:** `string[]` - Response messages
+    
+    ```javascript
+    blacklist.add('1234567890')
+    blacklist.add(['1111111111', '2222222222'])
+    ```
+  </Accordion>
+  
+  <Accordion title="remove">
+    Remove a number from the blacklist.
+    
+    **Parameters:**
+    - `phoneNumber` (string): Phone number to unblock
+    
+    **Returns:** `void`
+    
+    **Throws:** Error if number is not in blacklist
+    
+    ```javascript
+    blacklist.remove('1234567890')
+    ```
+  </Accordion>
+  
+  <Accordion title="checkIf">
+    Check if a number is blocked.
+    
+    **Parameters:**
+    - `phoneNumber` (string): Phone number to check
+    
+    **Returns:** `boolean` - true if blocked
+    
+    ```javascript
+    const isBlocked = blacklist.checkIf('1234567890')
+    ```
+  </Accordion>
+  
+  <Accordion title="getList">
+    Get all numbers in the blacklist.
+    
+    **Returns:** `string[]`
+    
+    ```javascript
+    const numbers = blacklist.getList()
+    console.log(numbers) // ['1234567890', '1111111111']
+    ```
+  </Accordion>
+</ResponseField>
+
+### Whitelist Mode
+
+Prefix numbers with `!` to enable whitelist mode (only allow those numbers):
+
+```javascript
+const whitelist = new BlackList(['!9999999999'])
+
+// Only 9999999999 can interact
+whitelist.checkIf('9999999999') // false (allowed)
+whitelist.checkIf('1111111111') // true (blocked)
+```
+
+## File Downloads
+
+<ResponseField name="generalDownload" type="function">
+  Downloads files from URLs or copies local files.
+  
+  **Parameters:**
+  - `url` (string): URL or local file path
+  - `pathToSave` (string): Optional directory path (defaults to system temp)
+  - `headers` (object): Optional HTTP headers
+  
+  **Returns:** `Promise<string>` - Path to downloaded file
+  
+  ```javascript
+  const { generalDownload } = require('@builderbot/bot/utils')
+  
+  // Download from URL
+  const filePath = await generalDownload(
+    'https://example.com/image.jpg',
+    './downloads'
+  )
+  
+  // With headers
+  const authFile = await generalDownload(
+    'https://api.example.com/file',
+    './downloads',
+    { Authorization: 'Bearer token' }
+  )
+  ```
+</ResponseField>
+
+## Hashing & Encryption
+
+<ResponseField name="generateRef" type="function">
+  Generates a unique UUID, optionally with a prefix.
+  
+  **Parameters:**
+  - `prefix` (string): Optional prefix for the UUID
+  
+  **Returns:** `string`
+  
+  ```javascript
+  const { generateRef } = require('@builderbot/bot/utils')
+  
+  const id = generateRef() // '123e4567-e89b-12d3-a456-426614174000'
+  const prefixed = generateRef('user') // 'user_123e4567...'
+  ```
+</ResponseField>
+
+<ResponseField name="generateTime" type="function">
+  Generates current timestamp in milliseconds.
+  
+  **Returns:** `number`
+  
+  ```javascript
+  const { generateTime } = require('@builderbot/bot/utils')
+  const timestamp = generateTime() // 1699564800000
+  ```
+</ResponseField>
+
+<ResponseField name="encryptData" type="function">
+  Encrypts data using AES-256-CBC.
+  
+  **Parameters:**
+  - `data` (string): Data to encrypt
+  
+  **Returns:** `string` - Base64 encoded encrypted data
+  
+  ```javascript
+  const { encryptData } = require('@builderbot/bot/utils')
+  const encrypted = encryptData('secret message')
+  ```
+</ResponseField>
+
+<ResponseField name="decryptData" type="function">
+  Decrypts AES-256-CBC encrypted data.
+  
+  **Parameters:**
+  - `encryptedData` (string): Base64 encoded encrypted data
+  
+  **Returns:** `string` - Decrypted data or 'FAIL' on error
+  
+  ```javascript
+  const { decryptData } = require('@builderbot/bot/utils')
+  const decrypted = decryptData(encrypted)
+  ```
+</ResponseField>
+
+## Queue Management
+
+<ResponseField name="Queue" type="class">
+  Manages concurrent task execution with limits.
+  
+  ```javascript
+  const { Queue } = require('@builderbot/bot/utils')
+  const queue = new Queue(console, 5, 30000) // 5 concurrent, 30s timeout
+  ```
+  
+  **Constructor Parameters:**
+  - `logger` (Console): Logger instance
+  - `concurrencyLimit` (number): Max concurrent tasks
+  - `timeout` (number): Task timeout in milliseconds
+</ResponseField>
+
+## Phone Number Utilities
+
+<ResponseField name="removePlus" type="function">
+  Removes plus sign and spaces from phone numbers.
+  
+  **Parameters:**
+  - `phone` (string): Phone number with + prefix
+  
+  **Returns:** `string` - Cleaned phone number
+  
+  ```javascript
+  const { removePlus } = require('@builderbot/bot/utils')
+  
+  const cleaned = removePlus('+1 234 567 8900')
+  console.log(cleaned) // '12345678900'
+  ```
+</ResponseField>
+
+## Examples
+
+### Delay Between Messages
+
+```javascript
+const { delay } = require('@builderbot/bot/utils')
+
+const typingFlow = addKeyword('story')
+  .addAnswer('Let me tell you a story...')
+  .addAnswer(
+    'First part',
+    null,
+    async (ctx, { flowDynamic }) => {
+      await delay(2000)
+      await flowDynamic('Second part...')
+      
+      await delay(2000)
+      await flowDynamic('The end!')
+    }
+  )
+```
+
+### Download Media
+
+```javascript
+const { generalDownload } = require('@builderbot/bot/utils')
+const { EVENTS } = require('@builderbot/bot')
+
+const imageFlow = addKeyword(EVENTS.MEDIA)
+  .addAnswer(
+    'Processing image...',
+    null,
+    async (ctx, { flowDynamic }) => {
+      const localPath = await generalDownload(
+        ctx.mediaUrl,
+        './media'
+      )
+      
+      await flowDynamic(`Image saved to: ${localPath}`)
+    }
+  )
+```
+
+### Dynamic Blacklist
+
+```javascript
+const blockFlow = addKeyword('block')
+  .addAnswer(
+    'Enter number to block:',
+    { capture: true },
+    async (ctx, { blacklist, flowDynamic }) => {
+      const numberToBlock = ctx.body
+      blacklist.add(numberToBlock)
+      
+      await flowDynamic(`Blocked: ${numberToBlock}`)
+    }
+  )
+
+const unblockFlow = addKeyword('unblock')
+  .addAnswer(
+    'Enter number to unblock:',
+    { capture: true },
+    async (ctx, { blacklist, flowDynamic }) => {
+      try {
+        blacklist.remove(ctx.body)
+        await flowDynamic(`Unblocked: ${ctx.body}`)
+      } catch (error) {
+        await flowDynamic('Number not in blacklist')
+      }
+    }
+  )
+```
+
+### Generate Unique IDs
+
+```javascript
+const { generateRef } = require('@builderbot/bot/utils')
+
+const orderFlow = addKeyword('order')
+  .addAnswer(
+    'Creating order...',
+    null,
+    async (ctx, { state, flowDynamic }) => {
+      const orderId = generateRef('order')
+      
+      await state.update({ orderId })
+      await flowDynamic(`Order ID: ${orderId}`)
+    }
+  )
+```

@@ -1,0 +1,550 @@
+---
+title: State Management
+description: Managing conversation state, global state, and idle state in BuilderBot
+---
+
+## Overview
+
+BuilderBot provides three types of state management to handle different scopes of data persistence during conversations:
+
+1. **Conversation State** (`state`) - User-specific data (per conversation)
+2. **Global State** (`globalState`) - Shared data across all conversations
+3. **Idle State** (`idle`) - Timeout and inactivity management
+
+## Conversation State
+
+Conversation state is **user-specific** and isolated per conversation. Each user has their own state object.
+
+### Type Definition
+
+```typescript
+type BotStateStandAlone = {
+  update: (props: { [key: string]: any }) => Promise<void>
+  getMyState: <K = any>() => { [key: string]: K }
+  get: <K = any>(prop: string) => K
+  clear: () => void
+}
+```
+
+### Updating State
+
+Store user-specific data during the conversation:
+
+```typescript
+const registerFlow = addKeyword('register')
+  .addAnswer(
+    'What is your name?',
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ name: ctx.body })
+    }
+  )
+  .addAnswer(
+    'What is your email?',
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ email: ctx.body })
+    }
+  )
+  .addAction(async (ctx, { flowDynamic, state }) => {
+    const name = state.get('name')
+    const email = state.get('email')
+    await flowDynamic(`Thanks ${name}! We'll contact you at ${email}.`)
+  })
+```
+
+<Note>
+  **Async Updates**: `state.update()` is asynchronous and returns a Promise. Always use `await`.
+</Note>
+
+### Reading State
+
+<Tabs>
+  <Tab title="Get Single Property">
+    ```typescript
+    const name = state.get('name')
+    const age = state.get('age')
+    ```
+    Retrieve a specific property from the state.
+  </Tab>
+  
+  <Tab title="Get Nested Property">
+    ```typescript
+    await state.update({
+      user: {
+        profile: {
+          name: 'John',
+          age: 30
+        }
+      }
+    })
+    
+    const name = state.get('user.profile.name') // 'John'
+    const age = state.get('user.profile.age')   // 30
+    ```
+    Access nested properties using dot notation.
+  </Tab>
+  
+  <Tab title="Get All State">
+    ```typescript
+    const allState = state.getMyState()
+    console.log(allState)
+    // { name: 'John', email: 'john@example.com', age: 30 }
+    ```
+    Retrieve the entire state object.
+  </Tab>
+</Tabs>
+
+### Clearing State
+
+Remove all state data for a user:
+
+```typescript
+const resetFlow = addKeyword('reset')
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    state.clear()
+    await flowDynamic('Your conversation has been reset.')
+  })
+```
+
+### Merging State
+
+The `update()` method merges new values with existing state:
+
+```typescript
+await state.update({ name: 'John' })
+await state.update({ age: 30 })
+
+const allState = state.getMyState()
+// { name: 'John', age: 30 }
+```
+
+Existing properties are preserved unless explicitly overwritten.
+
+## Global State
+
+Global state is **shared across all users** and conversations. Use it for application-wide data.
+
+### Type Definition
+
+```typescript
+type BotStateGlobal = {
+  update: (props: { [key: string]: any }) => Promise<void>
+  get: <K = any>(prop: string) => K
+  clear: () => void
+}
+```
+
+### Using Global State
+
+```typescript
+const statsFlow = addKeyword('stats')
+  .addAction(async (ctx, { globalState, flowDynamic }) => {
+    // Increment total interactions
+    const currentCount = globalState.get('totalInteractions') || 0
+    await globalState.update({ totalInteractions: currentCount + 1 })
+    
+    // Read global data
+    const total = globalState.get('totalInteractions')
+    const botVersion = globalState.get('version')
+    
+    await flowDynamic(`Total interactions: ${total}, Version: ${botVersion}`)
+  })
+```
+
+### Setting Initial Global State
+
+Configure global state when creating the bot:
+
+```typescript
+const { handleCtx, httpServer } = await createBot(
+  {
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  },
+  {
+    globalState: {
+      version: '1.0.0',
+      maintenanceMode: false,
+      supportEmail: 'support@example.com',
+      totalInteractions: 0
+    }
+  }
+)
+```
+
+### Global State Use Cases
+
+<Steps>
+  <Step title="Configuration">
+    Store application-wide settings:
+    ```typescript
+    await globalState.update({
+      maxRetries: 3,
+      apiEndpoint: 'https://api.example.com'
+    })
+    ```
+  </Step>
+  
+  <Step title="Metrics">
+    Track bot-wide statistics:
+    ```typescript
+    const totalUsers = globalState.get('totalUsers') || 0
+    await globalState.update({ totalUsers: totalUsers + 1 })
+    ```
+  </Step>
+  
+  <Step title="Feature Flags">
+    Control features globally:
+    ```typescript
+    const maintenanceMode = globalState.get('maintenanceMode')
+    if (maintenanceMode) {
+      return flowDynamic('Bot is under maintenance. Please try later.')
+    }
+    ```
+  </Step>
+</Steps>
+
+## State Implementation
+
+### SingleState Class (Conversation State)
+
+```typescript
+class SingleState {
+  private STATE: Map<string, StateValue> = new Map()
+
+  updateState = (ctx: Context = { from: '' }) => {
+    return (keyValue: StateValue) => {
+      return new Promise((resolve) => {
+        const currentStateByFrom = this.STATE.get(ctx.from) || {}
+        const updatedState = { ...currentStateByFrom, ...keyValue }
+        this.STATE.set(ctx.from, updatedState)
+        resolve()
+      })
+    }
+  }
+
+  getMyState = (from: string) => {
+    return () => this.STATE.get(from)
+  }
+
+  get = (from: string) => {
+    return (prop: string) => {
+      const state = this.STATE.get(from)
+      if (!state) return undefined
+
+      const properties = prop.split('.')
+      let result = state
+
+      for (const property of properties) {
+        result = result[property]
+        if (result === undefined) return undefined
+      }
+
+      return result
+    }
+  }
+
+  clear = (from: string) => {
+    return () => this.STATE.delete(from)
+  }
+}
+```
+
+**Key Features:**
+- Uses `Map` for O(1) lookups by user ID
+- Dot notation for nested property access
+- Merges updates with existing state
+
+### GlobalState Class
+
+```typescript
+class GlobalState {
+  private STATE: Map<string, GlobalStateType>
+
+  constructor() {
+    this.STATE = new Map<string, GlobalStateType>()
+    this.STATE.set('__global__', {})
+  }
+
+  updateState = () => {
+    return (keyValue: GlobalStateType) =>
+      new Promise((resolve) => {
+        const currentStateByFrom = this.STATE.get('__global__')
+        const updatedState = { ...currentStateByFrom, ...keyValue }
+        this.STATE.set('__global__', updatedState)
+        resolve()
+      })
+  }
+
+  getMyState = () => {
+    return () => this.STATE.get('__global__')
+  }
+
+  get = () => {
+    return (prop: string) => {
+      const globalState = this.STATE.get('__global__')
+      if (!globalState) return undefined
+
+      const properties = prop.split('.')
+      let result = globalState
+
+      for (const property of properties) {
+        result = result[property]
+        if (result === undefined) return undefined
+      }
+
+      return result
+    }
+  }
+
+  clear = () => {
+    return () => this.STATE.set('__global__', {})
+  }
+}
+```
+
+**Key Features:**
+- Single `'__global__'` key in Map
+- Same merge and dot-notation support
+- Shared across all users
+
+## Idle State
+
+Idle state manages **inactivity timeouts** and automatic flow transitions when users don't respond.
+
+### Type Definition
+
+```typescript
+interface SetIdleTimeParams {
+  from: string
+  inRef: any
+  timeInSeconds: number
+  cb?: Callback
+}
+
+type Callback = (context: { next: boolean; inRef: any }) => void
+```
+
+### Setting Idle Timeout
+
+```typescript
+const questionFlow = addKeyword('question')
+  .addAnswer(
+    'Please answer within 60 seconds...',
+    { capture: true, idle: 60000 },
+    async (ctx, { idle, gotoFlow }) => {
+      // User responded in time
+      await state.update({ answer: ctx.body })
+    }
+  )
+```
+
+<Warning>
+  The `idle` option in flow options is deprecated. Use the idle state methods directly for better control.
+</Warning>
+
+### IdleState Class Implementation
+
+```typescript
+class IdleState {
+  private indexCb: Map<string, QueueItem[]> = new Map()
+
+  setIdleTime = ({ from, inRef, timeInSeconds, cb }: SetIdleTimeParams): void => {
+    cb = cb ?? (() => {})
+    const startTime = new Date().getTime()
+    const endTime = startTime + timeInSeconds * 1000
+
+    if (!this.indexCb.has(from)) this.indexCb.set(from, [])
+    const queueCb = this.indexCb.get(from)!
+
+    const interval = setInterval(() => {
+      const internalTime = new Date().getTime()
+      if (internalTime > endTime) {
+        cb({ next: true, inRef })
+        const map = this.indexCb.get(from) ?? []
+        const index = map.findIndex((o) => o.inRef === inRef)
+        clearInterval(interval)
+        map.splice(index, 1)
+      }
+    }, 1000)
+
+    queueCb.push({
+      from,
+      inRef,
+      cb,
+      stop: (ctxInComing: any) => {
+        clearInterval(interval)
+        cb({ ...ctxInComing, next: false, inRef })
+      },
+    })
+  }
+
+  stop = (ctxInComing: { from: any }): void => {
+    try {
+      const queueCb = this.indexCb.get(ctxInComing.from) ?? []
+      for (const iterator of queueCb) {
+        iterator.stop(ctxInComing)
+      }
+      this.indexCb.set(ctxInComing.from, [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+}
+```
+
+**How it works:**
+1. Sets a timer for specified duration
+2. If timer expires, calls callback with `next: true`
+3. If user responds, `stop()` cancels timer with `next: false`
+4. Multiple timers can be active per user
+
+## Practical Examples
+
+### Multi-Step Form with State
+
+```typescript
+const registrationFlow = addKeyword(utils.setEvent('REGISTER'))
+  .addAnswer(
+    'Welcome to registration! What is your full name?',
+    { capture: true },
+    async (ctx, { state, fallBack }) => {
+      if (ctx.body.length < 3) {
+        return fallBack('Name must be at least 3 characters.')
+      }
+      await state.update({ name: ctx.body })
+    }
+  )
+  .addAnswer(
+    'What is your email address?',
+    { capture: true },
+    async (ctx, { state, fallBack }) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(ctx.body)) {
+        return fallBack('Invalid email format.')
+      }
+      await state.update({ email: ctx.body })
+    }
+  )
+  .addAnswer(
+    'What is your phone number?',
+    { capture: true },
+    async (ctx, { state, fallBack }) => {
+      const phoneRegex = /^\d{10}$/
+      if (!phoneRegex.test(ctx.body)) {
+        return fallBack('Phone must be 10 digits.')
+      }
+      await state.update({ phone: ctx.body })
+    }
+  )
+  .addAction(async (ctx, { flowDynamic, state }) => {
+    const userData = state.getMyState()
+    
+    await flowDynamic([
+      'Registration Complete!',
+      `Name: ${userData.name}`,
+      `Email: ${userData.email}`,
+      `Phone: ${userData.phone}`
+    ])
+    
+    // Clear state after confirmation
+    state.clear()
+  })
+```
+
+### Global Configuration Management
+
+```typescript
+const adminFlow = addKeyword('admin')
+  .addAnswer(
+    'Admin Panel\n1. Toggle Maintenance\n2. View Stats\n3. Update Config',
+    { capture: true },
+    async (ctx, { globalState, flowDynamic }) => {
+      if (ctx.body === '1') {
+        const current = globalState.get('maintenanceMode') || false
+        await globalState.update({ maintenanceMode: !current })
+        await flowDynamic(`Maintenance mode: ${!current ? 'ON' : 'OFF'}`)
+      }
+      
+      if (ctx.body === '2') {
+        const stats = {
+          totalUsers: globalState.get('totalUsers') || 0,
+          totalMessages: globalState.get('totalMessages') || 0,
+          version: globalState.get('version') || 'unknown'
+        }
+        await flowDynamic(JSON.stringify(stats, null, 2))
+      }
+    }
+  )
+
+// Increment message counter on every interaction
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAction(async (ctx, { globalState, flowDynamic }) => {
+    const count = globalState.get('totalMessages') || 0
+    await globalState.update({ totalMessages: count + 1 })
+    
+    await flowDynamic('Welcome!')
+  })
+```
+
+### Shopping Cart State
+
+```typescript
+const addToCartFlow = addKeyword('add')
+  .addAnswer(
+    'Enter product ID:',
+    { capture: true },
+    async (ctx, { state }) => {
+      const cart = state.get('cart') || []
+      cart.push({ id: ctx.body, quantity: 1 })
+      await state.update({ cart })
+    }
+  )
+
+const viewCartFlow = addKeyword('cart')
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    const cart = state.get('cart') || []
+    
+    if (cart.length === 0) {
+      return flowDynamic('Your cart is empty.')
+    }
+    
+    const items = cart.map((item, i) => 
+      `${i + 1}. Product ${item.id} (Qty: ${item.quantity})`
+    ).join('\n')
+    
+    await flowDynamic(`Your Cart:\n${items}`)
+  })
+
+const clearCartFlow = addKeyword('clear cart')
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    await state.update({ cart: [] })
+    await flowDynamic('Cart cleared.')
+  })
+```
+
+## Best Practices
+
+<Tip>
+  **Always Await Updates**: State updates are asynchronous. Always use `await` to ensure data is saved before proceeding.
+</Tip>
+
+<Warning>
+  **State is Temporary**: Conversation state is stored in memory and lost on bot restart. Use database adapters for persistence.
+</Warning>
+
+<Note>
+  **Nested Properties**: Use dot notation for nested access: `state.get('user.profile.name')`
+</Note>
+
+<Tip>
+  **Global State for Config**: Use global state for bot-wide configuration that needs to be accessible from all flows.
+</Tip>
+
+## Related Concepts
+
+- [Flows](/concepts/flows) - Build conversation flows
+- [Keywords](/concepts/keywords) - Trigger flows with keywords
+- [Databases](/concepts/databases) - Persist data across restarts

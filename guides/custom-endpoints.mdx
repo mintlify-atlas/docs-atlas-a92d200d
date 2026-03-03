@@ -1,0 +1,567 @@
+---
+title: Custom HTTP Endpoints
+description: Create custom API endpoints to control your bot programmatically
+---
+
+BuilderBot includes a built-in HTTP server that lets you create custom API endpoints. Use these to send messages, trigger flows, manage blacklists, and control your bot externally.
+
+## HTTP Server Setup
+
+The HTTP server starts automatically when you initialize the bot:
+
+```javascript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const PORT = process.env.PORT ?? 3008
+
+const main = async () => {
+    const adapterFlow = createFlow([welcomeFlow])
+    const adapterProvider = createProvider(BaileysProvider)
+    const adapterDB = new MemoryDB()
+
+    const { handleCtx, httpServer } = await createBot({
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    })
+
+    // Server starts on specified port
+    httpServer(+PORT)
+    console.log(`Server running on http://localhost:${PORT}`)
+}
+
+main()
+```
+
+## Creating Endpoints
+
+Use `handleCtx()` to create endpoints that have access to your bot instance:
+
+### Basic POST Endpoint
+
+```javascript
+adapterProvider.server.post(
+    '/v1/messages',
+    handleCtx(async (bot, req, res) => {
+        const { number, message } = req.body
+        
+        await bot.sendMessage(number, message, {})
+        
+        return res.end('sent')
+    })
+)
+```
+
+### Basic GET Endpoint
+
+```javascript
+adapterProvider.server.get(
+    '/v1/status',
+    handleCtx(async (bot, req, res) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ 
+            status: 'online',
+            timestamp: Date.now()
+        }))
+    })
+)
+```
+
+## Sending Messages
+
+Create an endpoint to send text messages:
+
+<Steps>
+  <Step title="Create message endpoint">
+    ```javascript
+    adapterProvider.server.post(
+        '/v1/messages',
+        handleCtx(async (bot, req, res) => {
+            const { number, message, urlMedia } = req.body
+            
+            await bot.sendMessage(number, message, { 
+                media: urlMedia ?? null 
+            })
+            
+            return res.end('sent')
+        })
+    )
+    ```
+  </Step>
+
+  <Step title="Test with cURL">
+    ```bash
+    curl -X POST http://localhost:3008/v1/messages \
+      -H "Content-Type: application/json" \
+      -d '{
+        "number": "1234567890",
+        "message": "Hello from API!"
+      }'
+    ```
+  </Step>
+
+  <Step title="Send with media">
+    ```bash
+    curl -X POST http://localhost:3008/v1/messages \
+      -H "Content-Type: application/json" \
+      -d '{
+        "number": "1234567890",
+        "message": "Check this image",
+        "urlMedia": "https://example.com/image.jpg"
+      }'
+    ```
+  </Step>
+</Steps>
+
+## Triggering Flows
+
+Trigger conversation flows programmatically:
+
+### Dispatch Custom Events
+
+```javascript
+// Create event-based flow
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+    .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ name: ctx.body })
+    })
+    .addAnswer('What is your age?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ age: ctx.body })
+    })
+
+// Create endpoint to trigger flow
+adapterProvider.server.post(
+    '/v1/register',
+    handleCtx(async (bot, req, res) => {
+        const { number, name } = req.body
+        
+        // Trigger the REGISTER_FLOW event
+        await bot.dispatch('REGISTER_FLOW', { 
+            from: number, 
+            name 
+        })
+        
+        return res.end('flow triggered')
+    })
+)
+```
+
+### Test Flow Trigger
+
+```bash
+curl -X POST http://localhost:3008/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "name": "John"
+  }'
+```
+
+## Blacklist Management
+
+Create endpoints to manage the blacklist:
+
+### Add/Remove from Blacklist
+
+```javascript
+adapterProvider.server.post(
+    '/v1/blacklist',
+    handleCtx(async (bot, req, res) => {
+        const { number, intent } = req.body
+        
+        if (intent === 'remove') {
+            bot.blacklist.remove(number)
+        } else if (intent === 'add') {
+            bot.blacklist.add(number)
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ 
+            status: 'ok', 
+            number, 
+            intent 
+        }))
+    })
+)
+```
+
+### Get Blacklist
+
+```javascript
+adapterProvider.server.get(
+    '/v1/blacklist/list',
+    handleCtx(async (bot, req, res) => {
+        const blacklist = bot.blacklist.getList()
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ 
+            status: 'ok', 
+            blacklist 
+        }))
+    })
+)
+```
+
+### Test Blacklist API
+
+```bash
+# Add to blacklist
+curl -X POST http://localhost:3008/v1/blacklist \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "intent": "add"
+  }'
+
+# Get blacklist
+curl http://localhost:3008/v1/blacklist/list
+
+# Remove from blacklist
+curl -X POST http://localhost:3008/v1/blacklist \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "intent": "remove"
+  }'
+```
+
+## State Management via API
+
+Access and modify state through HTTP endpoints:
+
+### Get User State
+
+```javascript
+adapterProvider.server.get(
+    '/v1/user/:number/state',
+    handleCtx(async (bot, req, res) => {
+        const { number } = req.params
+        const state = bot.state(number).getMyState()
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ state }))
+    })
+)
+```
+
+### Update User State
+
+```javascript
+adapterProvider.server.post(
+    '/v1/user/:number/state',
+    handleCtx(async (bot, req, res) => {
+        const { number } = req.params
+        const data = req.body
+        
+        await bot.state(number).update(data)
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ status: 'ok' }))
+    })
+)
+```
+
+### Clear User State
+
+```javascript
+adapterProvider.server.delete(
+    '/v1/user/:number/state',
+    handleCtx(async (bot, req, res) => {
+        const { number } = req.params
+        
+        bot.state(number).clear()
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ status: 'cleared' }))
+    })
+)
+```
+
+## Request Parameters
+
+Access different types of request data:
+
+<Accordion title="URL Parameters">
+  ```javascript
+  adapterProvider.server.get(
+      '/v1/user/:id/messages/:messageId',
+      handleCtx(async (bot, req, res) => {
+          const { id, messageId } = req.params
+          console.log('User ID:', id)
+          console.log('Message ID:', messageId)
+          
+          // Your logic here
+          res.end('ok')
+      })
+  )
+  ```
+</Accordion>
+
+<Accordion title="Query Parameters">
+  ```javascript
+  adapterProvider.server.get(
+      '/v1/search',
+      handleCtx(async (bot, req, res) => {
+          const { query, limit, offset } = req.query
+          console.log('Search query:', query)
+          console.log('Limit:', limit)
+          console.log('Offset:', offset)
+          
+          // Your logic here
+          res.end('ok')
+      })
+  )
+  // Call: GET /v1/search?query=test&limit=10&offset=0
+  ```
+</Accordion>
+
+<Accordion title="Request Body">
+  ```javascript
+  adapterProvider.server.post(
+      '/v1/data',
+      handleCtx(async (bot, req, res) => {
+          const { name, email, phone } = req.body
+          console.log('Received:', { name, email, phone })
+          
+          // Your logic here
+          res.end('ok')
+      })
+  )
+  ```
+</Accordion>
+
+## Response Formats
+
+### JSON Response
+
+```javascript
+adapterProvider.server.get(
+    '/v1/data',
+    handleCtx(async (bot, req, res) => {
+        const data = {
+            users: 100,
+            messages: 5000,
+            uptime: process.uptime()
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify(data))
+    })
+)
+```
+
+### Text Response
+
+```javascript
+adapterProvider.server.get(
+    '/v1/health',
+    handleCtx(async (bot, req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/plain' })
+        return res.end('OK')
+    })
+)
+```
+
+### Error Response
+
+```javascript
+adapterProvider.server.post(
+    '/v1/send',
+    handleCtx(async (bot, req, res) => {
+        try {
+            const { number, message } = req.body
+            
+            if (!number || !message) {
+                res.writeHead(400, { 'Content-Type': 'application/json' })
+                return res.end(JSON.stringify({ 
+                    error: 'Missing required fields' 
+                }))
+            }
+            
+            await bot.sendMessage(number, message, {})
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ status: 'sent' }))
+            
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ 
+                error: error.message 
+            }))
+        }
+    })
+)
+```
+
+## Complete API Example
+
+```javascript
+import { createBot, createProvider, createFlow, addKeyword, utils } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const PORT = process.env.PORT ?? 3008
+
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+    .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+        await state.update({ name: ctx.body })
+    })
+
+const main = async () => {
+    const adapterFlow = createFlow([registerFlow])
+    const adapterProvider = createProvider(BaileysProvider)
+    const adapterDB = new MemoryDB()
+
+    const { handleCtx, httpServer } = await createBot({
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    })
+
+    // Send message endpoint
+    adapterProvider.server.post(
+        '/v1/messages',
+        handleCtx(async (bot, req, res) => {
+            const { number, message, urlMedia } = req.body
+            await bot.sendMessage(number, message, { media: urlMedia ?? null })
+            return res.end('sent')
+        })
+    )
+
+    // Trigger flow endpoint
+    adapterProvider.server.post(
+        '/v1/register',
+        handleCtx(async (bot, req, res) => {
+            const { number, name } = req.body
+            await bot.dispatch('REGISTER_FLOW', { from: number, name })
+            return res.end('triggered')
+        })
+    )
+
+    // Blacklist management
+    adapterProvider.server.post(
+        '/v1/blacklist',
+        handleCtx(async (bot, req, res) => {
+            const { number, intent } = req.body
+            if (intent === 'remove') bot.blacklist.remove(number)
+            if (intent === 'add') bot.blacklist.add(number)
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ status: 'ok', number, intent }))
+        })
+    )
+
+    // Get blacklist
+    adapterProvider.server.get(
+        '/v1/blacklist/list',
+        handleCtx(async (bot, req, res) => {
+            const blacklist = bot.blacklist.getList()
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ status: 'ok', blacklist }))
+        })
+    )
+
+    // Health check
+    adapterProvider.server.get(
+        '/v1/health',
+        handleCtx(async (bot, req, res) => {
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ 
+                status: 'online',
+                uptime: process.uptime()
+            }))
+        })
+    )
+
+    httpServer(+PORT)
+    console.log(`🚀 Server running on http://localhost:${PORT}`)
+}
+
+main()
+```
+
+## Bot Instance Methods
+
+These methods are available on the `bot` object in `handleCtx`:
+
+| Method | Description |
+|--------|-------------|
+| `bot.sendMessage(number, message, options)` | Send a message to a number |
+| `bot.dispatch(event, context)` | Trigger a custom event flow |
+| `bot.blacklist.add(number)` | Add number to blacklist |
+| `bot.blacklist.remove(number)` | Remove number from blacklist |
+| `bot.blacklist.getList()` | Get all blacklisted numbers |
+| `bot.state(number)` | Access user state |
+| `bot.globalState()` | Access global state |
+| `bot.provider` | Access provider instance |
+
+## Best Practices
+
+<Accordion title="Validate input">
+  Always validate request data:
+  ```javascript
+  adapterProvider.server.post('/v1/send',
+      handleCtx(async (bot, req, res) => {
+          const { number, message } = req.body
+          
+          if (!number || !message) {
+              res.writeHead(400, { 'Content-Type': 'application/json' })
+              return res.end(JSON.stringify({ error: 'Missing fields' }))
+          }
+          
+          // Process request...
+      })
+  )
+  ```
+</Accordion>
+
+<Accordion title="Handle errors gracefully">
+  Wrap logic in try-catch blocks:
+  ```javascript
+  adapterProvider.server.post('/v1/action',
+      handleCtx(async (bot, req, res) => {
+          try {
+              // Your logic
+              res.end('ok')
+          } catch (error) {
+              console.error(error)
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'Internal error' }))
+          }
+      })
+  )
+  ```
+</Accordion>
+
+<Accordion title="Use appropriate HTTP methods">
+  - GET: Retrieve data
+  - POST: Create/trigger actions
+  - PUT/PATCH: Update data
+  - DELETE: Remove data
+</Accordion>
+
+<Accordion title="Secure your endpoints">
+  Add authentication:
+  ```javascript
+  const authenticate = (req) => {
+      const token = req.headers['authorization']
+      return token === `Bearer ${process.env.API_TOKEN}`
+  }
+
+  adapterProvider.server.post('/v1/send',
+      handleCtx(async (bot, req, res) => {
+          if (!authenticate(req)) {
+              res.writeHead(401, { 'Content-Type': 'application/json' })
+              return res.end(JSON.stringify({ error: 'Unauthorized' }))
+          }
+          // Your logic...
+      })
+  )
+  ```
+</Accordion>
+
+## Next Steps
+
+- Learn about [State Management](/guides/state-management) to use state in endpoints
+- Explore [Queue System](/guides/queue-system) to understand message processing
+- Check out [Testing](/guides/testing) to test your endpoints

@@ -1,0 +1,401 @@
+---
+title: Handling Media Files
+description: Send and receive images, videos, audio, and documents in your bot
+---
+
+BuilderBot makes it easy to handle media files in your conversations. Learn how to send images, videos, audio files, and documents from local storage or URLs.
+
+## Sending Images
+
+### From Local Files
+
+Send images stored in your project:
+
+```javascript
+import { join } from 'path'
+import { addKeyword } from '@builderbot/bot'
+
+const imageFlow = addKeyword('photo')
+    .addAnswer('Here is your image:', {
+        media: join(process.cwd(), 'assets', 'sample.png')
+    })
+```
+
+<Note>
+  Use `process.cwd()` to get the current working directory and `join()` to create cross-platform file paths.
+</Note>
+
+### From URLs
+
+Send images from the internet:
+
+```javascript
+const imageFlow = addKeyword('logo')
+    .addAnswer('Our company logo:', {
+        media: 'https://example.com/images/logo.png'
+    })
+```
+
+### Dynamic Images
+
+Send images based on user input or business logic:
+
+```javascript
+const productFlow = addKeyword('product')
+    .addAnswer('Which product? (1-5)', { capture: true })
+    .addAction(async (ctx, { flowDynamic }) => {
+        const productId = ctx.body
+        const imageUrl = `https://api.example.com/products/${productId}/image.jpg`
+        
+        await flowDynamic([
+            { body: `Product #${productId}`, media: imageUrl }
+        ])
+    })
+```
+
+## Sending Videos
+
+### Video from URL
+
+```javascript
+const videoFlow = addKeyword('video')
+    .addAnswer('Check out this video:', {
+        media: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTJ0ZGdjd2syeXAwMjQ4aWdkcW04OWlqcXI3Ynh1ODkwZ25zZWZ1dCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/LCohAb657pSdHv0Q5h/giphy.mp4'
+    })
+```
+
+### Video from Local Storage
+
+```javascript
+import { join } from 'path'
+
+const tutorialFlow = addKeyword('tutorial')
+    .addAnswer('Tutorial video:', {
+        media: join(process.cwd(), 'videos', 'tutorial.mp4')
+    })
+```
+
+## Sending Audio Files
+
+### Audio from URL
+
+```javascript
+const audioFlow = addKeyword('audio')
+    .addAnswer('Listen to this:', {
+        media: 'https://cdn.freesound.org/previews/728/728142_11861866-lq.mp3'
+    })
+```
+
+### Voice Messages
+
+For voice note style messages, use audio files in supported formats (mp3, ogg, wav):
+
+```javascript
+const voiceFlow = addKeyword('voice')
+    .addAnswer('Voice message:', {
+        media: join(process.cwd(), 'audio', 'greeting.mp3')
+    })
+```
+
+## Sending Documents
+
+### PDF Files
+
+```javascript
+const pdfFlow = addKeyword('invoice')
+    .addAnswer('Your invoice:', {
+        media: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+    })
+```
+
+### Other Document Types
+
+Send any document type (docx, xlsx, txt, etc.):
+
+```javascript
+const documentFlow = addKeyword('report')
+    .addAction(async (ctx, { flowDynamic }) => {
+        const reportPath = join(process.cwd(), 'reports', 'monthly-report.xlsx')
+        
+        await flowDynamic([
+            { body: 'Monthly Report', media: reportPath }
+        ])
+    })
+```
+
+## Sending Multiple Media Files
+
+<Steps>
+  <Step title="Create a media samples flow">
+    ```javascript
+    const samplesFlow = addKeyword(['samples', 'media'])
+        .addAnswer('💪 Sending multiple files...')
+    ```
+  </Step>
+
+  <Step title="Chain multiple media messages">
+    ```javascript
+    const samplesFlow = addKeyword(['samples', 'media'])
+        .addAnswer('💪 Sending multiple files...')
+        .addAnswer('Image from local:', {
+            media: join(process.cwd(), 'assets', 'sample.png')
+        })
+        .addAnswer('Video from URL:', {
+            media: 'https://media.giphy.com/media/LCohAb657pSdHv0Q5h/giphy.mp4'
+        })
+        .addAnswer('Audio file:', {
+            media: 'https://cdn.freesound.org/previews/728/728142_11861866-lq.mp3'
+        })
+        .addAnswer('PDF document:', {
+            media: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+        })
+    ```
+  </Step>
+</Steps>
+
+## Receiving Media from Users
+
+Handle media sent by users with event-based flows:
+
+### Detecting Media Messages
+
+```javascript
+import { addKeyword, utils } from '@builderbot/bot'
+
+const mediaFlow = addKeyword(utils.setEvent('MEDIA'))
+    .addAnswer('Thanks for the image! Processing...', null, async (ctx, { flowDynamic }) => {
+        // ctx contains the media information
+        console.log('Media URL:', ctx.url)
+        console.log('Media type:', ctx.type)
+        
+        // Download and process the media
+        await processMedia(ctx.url)
+        
+        await flowDynamic('Image processed successfully!')
+    })
+```
+
+### Handling Different Media Types
+
+<Accordion title="Images">
+  ```javascript
+  const imageReceivedFlow = addKeyword(utils.setEvent('MEDIA'))
+      .addAction(async (ctx, { flowDynamic }) => {
+          if (ctx.type === 'image') {
+              await flowDynamic('Processing your image...')
+              // Your image processing logic
+          }
+      })
+  ```
+</Accordion>
+
+<Accordion title="Documents">
+  ```javascript
+  const documentReceivedFlow = addKeyword(utils.setEvent('DOCUMENT'))
+      .addAnswer('Document received!', null, async (ctx, { flowDynamic }) => {
+          console.log('Document name:', ctx.filename)
+          console.log('Document URL:', ctx.url)
+          
+          await flowDynamic('We received your document and will review it.')
+      })
+  ```
+</Accordion>
+
+<Accordion title="Voice Notes">
+  ```javascript
+  const voiceNoteFlow = addKeyword(utils.setEvent('VOICE_NOTE'))
+      .addAnswer('Voice note received!', null, async (ctx, { flowDynamic }) => {
+          // Process voice note
+          const transcription = await transcribeAudio(ctx.url)
+          await flowDynamic(`You said: ${transcription}`)
+      })
+  ```
+</Accordion>
+
+## Sending Media via HTTP Endpoint
+
+Send media programmatically through your API:
+
+```javascript
+adapterProvider.server.post(
+    '/v1/messages',
+    handleCtx(async (bot, req, res) => {
+        const { number, message, urlMedia } = req.body
+        
+        await bot.sendMessage(number, message, { 
+            media: urlMedia ?? null 
+        })
+        
+        return res.end('sent')
+    })
+)
+```
+
+Example API call:
+
+```bash
+curl -X POST http://localhost:3008/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "1234567890",
+    "message": "Check this out!",
+    "urlMedia": "https://example.com/image.jpg"
+  }'
+```
+
+## Using flowDynamic for Media
+
+Send media dynamically within callbacks:
+
+```javascript
+const catalogFlow = addKeyword('catalog')
+    .addAction(async (ctx, { flowDynamic }) => {
+        const products = await getProducts() // Your function
+        
+        for (const product of products) {
+            await flowDynamic([
+                {
+                    body: `${product.name} - $${product.price}`,
+                    media: product.imageUrl
+                }
+            ])
+        }
+    })
+```
+
+## Media with Captions and Delays
+
+Add context and pacing to media messages:
+
+```javascript
+const productFlow = addKeyword('featured')
+    .addAnswer('Our featured products:', { delay: 500 })
+    .addAnswer('Product 1: Premium Widget', {
+        media: 'https://example.com/product1.jpg',
+        delay: 1000
+    })
+    .addAnswer('Product 2: Deluxe Gadget', {
+        media: 'https://example.com/product2.jpg',
+        delay: 1000
+    })
+```
+
+## Complete Media Example
+
+```javascript
+import { join } from 'path'
+import { createBot, createProvider, createFlow, addKeyword, utils } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const PORT = process.env.PORT ?? 3008
+
+// Media samples flow
+const fullSamplesFlow = addKeyword(['samples', utils.setEvent('SAMPLES')])
+    .addAnswer('💪 Sending you various files...')
+    .addAnswer('Image from local:', {
+        media: join(process.cwd(), 'assets', 'sample.png')
+    })
+    .addAnswer('Video from URL:', {
+        media: 'https://media.giphy.com/media/LCohAb657pSdHv0Q5h/giphy.mp4'
+    })
+    .addAnswer('Audio file:', {
+        media: 'https://cdn.freesound.org/previews/728/728142_11861866-lq.mp3'
+    })
+    .addAnswer('PDF document:', {
+        media: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+    })
+
+// Handle received media
+const mediaReceivedFlow = addKeyword(utils.setEvent('MEDIA'))
+    .addAnswer('Thanks for the image!', null, async (ctx, { flowDynamic }) => {
+        console.log('Received media:', ctx.url)
+        await flowDynamic('I received your image successfully!')
+    })
+
+const main = async () => {
+    const adapterFlow = createFlow([fullSamplesFlow, mediaReceivedFlow])
+    const adapterProvider = createProvider(BaileysProvider)
+    const adapterDB = new MemoryDB()
+
+    const { handleCtx, httpServer } = await createBot({
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    })
+
+    // HTTP endpoint to send media
+    adapterProvider.server.post(
+        '/v1/media',
+        handleCtx(async (bot, req, res) => {
+            const { number, message, urlMedia } = req.body
+            await bot.sendMessage(number, message, { media: urlMedia })
+            return res.end('media sent')
+        })
+    )
+
+    httpServer(+PORT)
+}
+
+main()
+```
+
+## Best Practices
+
+<Accordion title="Optimize media file sizes">
+  Keep file sizes reasonable to ensure fast delivery:
+  - Images: < 5MB
+  - Videos: < 16MB
+  - Audio: < 16MB
+  - Documents: < 100MB
+</Accordion>
+
+<Accordion title="Use CDNs for media">
+  Host media files on a CDN for better performance and reliability:
+  ```javascript
+  const media = 'https://cdn.yourservice.com/images/product.jpg'
+  ```
+</Accordion>
+
+<Accordion title="Handle media errors gracefully">
+  Always wrap media sending in try-catch blocks:
+  ```javascript
+  .addAction(async (ctx, { flowDynamic }) => {
+      try {
+          await flowDynamic([{ 
+              body: 'Your image', 
+              media: imageUrl 
+          }])
+      } catch (error) {
+          console.error('Failed to send media:', error)
+          await flowDynamic('Sorry, failed to send the image.')
+      }
+  })
+  ```
+</Accordion>
+
+<Accordion title="Validate media URLs">
+  Check that URLs are accessible before sending:
+  ```javascript
+  const isValidUrl = await checkMediaUrl(mediaUrl)
+  if (!isValidUrl) {
+      await flowDynamic('Media not available')
+      return
+  }
+  ```
+</Accordion>
+
+## Supported Media Formats
+
+| Type | Formats |
+|------|--------|
+| Images | JPG, PNG, GIF, WebP |
+| Videos | MP4, AVI, MOV |
+| Audio | MP3, OGG, WAV, M4A |
+| Documents | PDF, DOC, DOCX, XLS, XLSX, TXT, ZIP |
+
+## Next Steps
+
+- Learn about [Creating Flows](/guides/creating-flows) to build conversations
+- Explore [State Management](/guides/state-management) to track user preferences
+- Check out [Custom Endpoints](/guides/custom-endpoints) to trigger media sending via API

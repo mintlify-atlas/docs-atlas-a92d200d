@@ -1,0 +1,358 @@
+---
+title: Keywords and Matching
+description: Understanding addKeyword and the keyword matching system in BuilderBot
+---
+
+## What is addKeyword?
+
+`addKeyword` is the fundamental building block for creating conversation flows in BuilderBot. It defines trigger words or patterns that activate specific conversation paths when users send matching messages.
+
+## Basic Usage
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const flow = addKeyword('hello')
+  .addAnswer('Hi there! How can I help you?')
+```
+
+When a user sends a message containing "hello", this flow triggers and sends the response.
+
+## Type Signature
+
+```typescript
+const addKeyword = <P = any, B = any>(
+  keyword: string | [string, ...string[]],
+  options?: ActionPropertiesKeyword
+): TFlow<P, B>
+```
+
+**Parameters:**
+- `keyword` - A string, array of strings, or regex pattern
+- `options` - Optional configuration for matching behavior
+
+**Generic Types:**
+- `P` - Provider type (WhatsApp, Telegram, etc.)
+- `B` - Database type (MySQL, Postgres, etc.)
+
+## Keyword Types
+
+<Tabs>
+  <Tab title="Single Keyword">
+    ```typescript
+    const flow = addKeyword('help')
+      .addAnswer('Here are the available commands...')
+    ```
+    Matches messages containing the word "help".
+  </Tab>
+  
+  <Tab title="Multiple Keywords">
+    ```typescript
+    const flow = addKeyword(['hi', 'hello', 'hey', 'hola'])
+      .addAnswer('Welcome! How can I assist you?')
+    ```
+    Matches any of the specified keywords.
+  </Tab>
+  
+  <Tab title="Regex Pattern">
+    ```typescript
+    const flow = addKeyword('/^\d{4}$/', { regex: true })
+      .addAnswer('You entered a 4-digit code!')
+    ```
+    Matches messages using regular expressions.
+  </Tab>
+</Tabs>
+
+## Matching Options
+
+The `ActionPropertiesKeyword` interface provides powerful matching configuration:
+
+```typescript
+type ActionPropertiesKeyword = {
+  sensitive?: boolean  // Case-sensitive matching
+  regex?: boolean      // Enable regex matching
+  capture?: boolean    // Capture user response
+  delay?: number       // Delay before responding (ms)
+  idle?: number        // Idle timeout (deprecated)
+  buttons?: Button[]   // Interactive buttons
+  media?: string       // Attach media file
+  ref?: string         // Internal reference (dev only)
+}
+```
+
+### Case Sensitivity
+
+By default, keyword matching is **case-insensitive**:
+
+```typescript
+// Default: case-insensitive
+const flow1 = addKeyword('HELLO')
+// Matches: "hello", "Hello", "HELLO", "HeLLo"
+
+// Case-sensitive
+const flow2 = addKeyword('HELLO', { sensitive: true })
+// Matches: "HELLO" only
+```
+
+<Note>
+  When `sensitive: false` (default), the matching uses word boundaries (`\b`) to ensure whole word matching.
+</Note>
+
+### Regex Matching
+
+Enable powerful pattern matching with regular expressions:
+
+```typescript
+// Match email addresses
+const emailFlow = addKeyword(
+  '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
+  { regex: true }
+).addAnswer('Thanks for providing your email!')
+
+// Match phone numbers
+const phoneFlow = addKeyword(
+  '/^\+?[1-9]\d{1,14}$/',
+  { regex: true }
+).addAnswer('Phone number received!')
+
+// Match any number
+const numberFlow = addKeyword(
+  '/^\d+$/',
+  { regex: true }
+).addAnswer('You entered a number!')
+```
+
+<Warning>
+  When using regex, pass the pattern as a string (e.g., `'/pattern/'`) not a RegExp object. The framework converts it internally.
+</Warning>
+
+## Internal Matching Logic
+
+The keyword matching system uses a sophisticated algorithm:
+
+```typescript
+const mapSensitive = (str: string | string[], mapOptions: { sensitive: boolean; regex: boolean }): RegExp => {
+  if (mapOptions.regex) return new Function(`return ${str}`)()
+  
+  const regexSensitive = mapOptions.sensitive ? 'g' : 'i'
+  
+  if (Array.isArray(str)) {
+    const patterns = mapOptions.sensitive 
+      ? str.map((item) => `\\b${item}\\b`) 
+      : str
+    return new RegExp(patterns.join('|'), regexSensitive)
+  }
+  
+  const pattern = mapOptions.sensitive ? `\\b${str}\\b` : str
+  return new RegExp(pattern, regexSensitive)
+}
+```
+
+<Steps>
+  <Step title="Regex Mode">
+    If `regex: true`, the keyword string is evaluated as a regex pattern.
+  </Step>
+  
+  <Step title="Array Handling">
+    Multiple keywords are joined with `|` (OR operator) to match any keyword.
+  </Step>
+  
+  <Step title="Sensitivity">
+    Case-sensitive mode adds word boundaries; insensitive uses the `i` flag.
+  </Step>
+  
+  <Step title="Pattern Test">
+    The resulting RegExp tests against the incoming message body.
+  </Step>
+</Steps>
+
+## Chaining Methods
+
+The `addKeyword` function returns a flow object with chainable methods:
+
+```typescript
+const flow = addKeyword('start')
+  .addAnswer('Welcome!')
+  .addAnswer('What is your name?', { capture: true })
+  .addAction(async (ctx, { state }) => {
+    await state.update({ name: ctx.body })
+  })
+```
+
+### Available Methods
+
+<Tabs>
+  <Tab title="addAnswer">
+    ```typescript
+    addAnswer(
+      answer: string | string[],
+      options?: ActionPropertiesKeyword | null,
+      cb?: CallbackFunction<P, B> | null,
+      nested?: TFlow<P, B> | TFlow<P, B>[] | null
+    ): TFlow<P, B>
+    ```
+    Add a response message with optional callback and nested flows.
+  </Tab>
+  
+  <Tab title="addAction">
+    ```typescript
+    addAction(
+      cb: CallbackFunction<P, B> = () => null,
+      flagCb: CallbackFunction<P, B> = () => null
+    ): TFlow<P, B>
+    ```
+    Execute a callback function without sending a message.
+  </Tab>
+  
+  <Tab title="toJson">
+    ```typescript
+    toJson(): TContext[]
+    ```
+    Serialize the flow to JSON format (internal use).
+  </Tab>
+</Tabs>
+
+## Practical Examples
+
+### Registration Flow with Capture
+
+```typescript
+import { addKeyword, utils } from '@builderbot/bot'
+
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+  .addAnswer(
+    'What is your name?',
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ name: ctx.body })
+    }
+  )
+  .addAnswer(
+    'What is your age?',
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ age: ctx.body })
+    }
+  )
+  .addAction(async (ctx, { flowDynamic, state }) => {
+    const name = state.get('name')
+    const age = state.get('age')
+    await flowDynamic(`Thanks ${name}! Your age is ${age}.`)
+  })
+```
+
+### Conditional Flow Navigation
+
+```typescript
+const menuFlow = addKeyword(['menu', 'options'])
+  .addAnswer(
+    'Choose an option:\n1. Sales\n2. Support\n3. About',
+    { capture: true },
+    async (ctx, { gotoFlow, fallBack }) => {
+      const option = ctx.body.trim()
+      
+      if (option === '1') return gotoFlow(salesFlow)
+      if (option === '2') return gotoFlow(supportFlow)
+      if (option === '3') return gotoFlow(aboutFlow)
+      
+      return fallBack('Invalid option. Please enter 1, 2, or 3.')
+    },
+    [salesFlow, supportFlow, aboutFlow]
+  )
+```
+
+### Validation with Regex
+
+```typescript
+const emailFlow = addKeyword('email')
+  .addAnswer(
+    'Please provide your email address:',
+    { capture: true },
+    async (ctx, { fallBack, state }) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      
+      if (!emailRegex.test(ctx.body)) {
+        return fallBack('Invalid email format. Please try again.')
+      }
+      
+      await state.update({ email: ctx.body })
+    }
+  )
+  .addAnswer('Email saved successfully!')
+```
+
+### Multi-language Support
+
+```typescript
+const welcomeFlow = addKeyword([
+  'hello', 'hi', 'hey',          // English
+  'hola', 'buenos dias',         // Spanish
+  'bonjour', 'salut',            // French
+  'ciao', 'buongiorno'           // Italian
+]).addAnswer('Welcome! How can I help you today?')
+```
+
+## Context Structure
+
+When a keyword matches, BuilderBot creates a context object:
+
+```typescript
+const ctxAddKeyword = (): TContext => {
+  const ref = `key_${generateRef()}`
+  const parsedOptions = parseOptions()
+  const json = [
+    {
+      ref,
+      keyword,
+      options: parsedOptions,
+    },
+  ]
+  return { ref, keyword, options: parsedOptions, json }
+}
+```
+
+**Properties:**
+- `ref` - Unique identifier (e.g., `key_abc123`)
+- `keyword` - The matched keyword(s)
+- `options` - Parsed matching options
+- `json` - Serialized flow data
+
+## Error Handling
+
+The function validates input types:
+
+```typescript
+if (typeof keyword !== 'string' && !Array.isArray(keyword)) {
+  throw new Error('DEBE_SER_STRING_ARRAY_REGEX')
+}
+```
+
+<Warning>
+  Always pass keywords as a string or array of strings. Objects and other types will throw an error.
+</Warning>
+
+## Best Practices
+
+<Tip>
+  **Use Arrays for Variations**: Instead of creating multiple flows for similar keywords, use arrays:
+  ```typescript
+  addKeyword(['help', 'ayuda', 'aide'])
+  ```
+</Tip>
+
+<Tip>
+  **Combine with Events**: For programmatic triggers, combine keywords with events:
+  ```typescript
+  addKeyword(utils.setEvent('WELCOME'))
+  ```
+</Tip>
+
+<Note>
+  **Word Boundaries**: Case-sensitive matching automatically adds word boundaries (`\b`) to ensure whole-word matches, preventing partial matches like "helping" matching "help".
+</Note>
+
+## Related Concepts
+
+- [Flows](/concepts/flows) - Understanding the flow system
+- [State Management](/concepts/state-management) - Capture and store user data
+- [Events](/concepts/events) - Use event-based triggers

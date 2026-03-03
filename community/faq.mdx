@@ -1,0 +1,244 @@
+---
+title: Frequently Asked Questions
+description: Common questions about BuilderBot setup and usage
+---
+
+## Getting Started
+
+<AccordionGroup>
+  <Accordion title="What is BuilderBot?">
+    BuilderBot is a library that allows you to build automated conversation flows agnostic to the WhatsApp provider. You can set up automated responses for frequently asked questions, receive and respond to messages automatically, and track interactions with customers. The library provides an easy way to set up triggers to expand functionalities limitlessly.
+  </Accordion>
+
+  <Accordion title="How do I install BuilderBot?">
+    The easiest way to get started is using our CLI tool:
+    
+    ```bash
+    npm create builderbot@latest
+    ```
+    
+    This will guide you through creating a new project with your preferred provider and database.
+  </Accordion>
+
+  <Accordion title="What are the system requirements?">
+    To use BuilderBot, you need:
+    
+    - Node.js v20 or higher
+    - pnpm (recommended) or npm as package manager
+    - A WhatsApp provider (Baileys, Evolution API, etc.)
+    - Optional: A database (MySQL, PostgreSQL, MongoDB, or JSON file)
+  </Accordion>
+
+  <Accordion title="Which WhatsApp providers are supported?">
+    BuilderBot supports multiple WhatsApp providers:
+    
+    - **Baileys** - Free, open-source WhatsApp Web API
+    - **Evolution API** - Robust WhatsApp solution
+    - **Meta (Official)** - Official WhatsApp Business API
+    - **Twilio** - Enterprise messaging platform
+    
+    Each provider has different features, pricing, and reliability characteristics.
+  </Accordion>
+</AccordionGroup>
+
+## Database & Storage
+
+<AccordionGroup>
+  <Accordion title="Do I need a database?">
+    No, a database is optional. BuilderBot supports several storage options:
+    
+    - **Memory** - No persistence, data lost on restart (good for testing)
+    - **JSON** - Simple file-based storage
+    - **MySQL** - Relational database
+    - **PostgreSQL** - Advanced relational database
+    - **MongoDB** - NoSQL database
+    
+    For production use, we recommend using a persistent database like MySQL, PostgreSQL, or MongoDB.
+  </Accordion>
+
+  <Accordion title="How do I configure database connections?">
+    Database configuration is done in your `app.js` file. For example, with MySQL:
+    
+    ```js
+    const MySQLAdapter = require('@bot-whatsapp/database/mysql')
+    
+    const MYSQL_DB_HOST = 'localhost'
+    const MYSQL_DB_USER = 'your_user'
+    const MYSQL_DB_PASSWORD = 'your_password'
+    const MYSQL_DB_NAME = 'your_database'
+    ```
+    
+    Similar configuration patterns apply to other databases.
+  </Accordion>
+
+  <Accordion title="Can I switch databases later?">
+    Yes, BuilderBot's architecture allows you to switch databases relatively easily. You'll need to:
+    
+    1. Install the new database adapter
+    2. Update your configuration in `app.js`
+    3. Migrate any existing data to the new database
+    
+    The conversation flow logic remains the same regardless of the database choice.
+  </Accordion>
+</AccordionGroup>
+
+## Development & Deployment
+
+<AccordionGroup>
+  <Accordion title="Can I use TypeScript with BuilderBot?">
+    Yes! BuilderBot fully supports TypeScript. You can create TypeScript projects using the CLI, and all features work seamlessly with TypeScript for better type safety and development experience.
+  </Accordion>
+
+  <Accordion title="How do I deploy BuilderBot to production?">
+    BuilderBot can be deployed to any Node.js hosting platform:
+    
+    - Traditional servers (VPS, dedicated servers)
+    - Cloud platforms (AWS, Google Cloud, Azure)
+    - Container platforms (Docker, Kubernetes)
+    - Platform-as-a-Service (Heroku, Railway, Render)
+    
+    Make sure to:
+    - Use environment variables for sensitive data
+    - Choose a persistent database for production
+    - Set up proper monitoring and logging
+    - Consider using PM2 or similar process managers
+  </Accordion>
+
+  <Accordion title="How do I handle multiple WhatsApp numbers?">
+    You can run multiple instances of BuilderBot, each connected to a different WhatsApp number. Each instance should have its own configuration and potentially its own database or database namespace to keep conversations separate.
+  </Accordion>
+
+  <Accordion title="Can I use BuilderBot with Docker?">
+    Yes, BuilderBot works great with Docker. The starters include Dockerfile examples that you can use as a starting point for containerizing your bot application.
+  </Accordion>
+</AccordionGroup>
+
+## Features & Functionality
+
+<AccordionGroup>
+  <Accordion title="What types of messages can BuilderBot handle?">
+    BuilderBot can handle various message types:
+    
+    - Text messages
+    - Images and photos
+    - Videos
+    - Documents and files
+    - Audio messages
+    - Stickers
+    - Location data
+    - Contact cards (vCards)
+    - Interactive buttons and lists (provider-dependent)
+  </Accordion>
+
+  <Accordion title="Can I integrate with DialogFlow or other AI services?">
+    Yes! BuilderBot supports integration with:
+    
+    - DialogFlow CX and ES (Essential)
+    - Custom AI/NLP services
+    - Third-party APIs
+    - External databases and services
+    
+    The modular architecture makes it easy to extend functionality with any service.
+  </Accordion>
+
+  <Accordion title="How do I create conversation flows?">
+    BuilderBot uses a flow-based approach where you define conversation steps:
+    
+    ```js
+    const flowWelcome = addKeyword(['hello', 'hi'])
+      .addAnswer('Welcome! How can I help you?')
+      .addAnswer('Choose an option:', { buttons: [...] })
+    ```
+    
+    Flows can be nested, conditional, and include dynamic content based on user input.
+  </Accordion>
+
+  <Accordion title="Can I send scheduled messages?">
+    Yes, you can implement scheduled messaging by:
+    
+    - Using cron jobs or task schedulers
+    - Integrating with queue systems
+    - Leveraging the provider's API directly
+    
+    The specific implementation depends on your use case and infrastructure.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The QR code won't scan - what should I do?">
+    If you're having trouble with QR code scanning:
+    
+    - Make sure your phone has a stable internet connection
+    - Try clearing WhatsApp cache on your phone
+    - Ensure the terminal window is large enough to display the full QR code
+    - Try the web portal for QR scanning if available
+    - Check that you're using a compatible WhatsApp provider
+  </Accordion>
+
+  <Accordion title="My bot keeps disconnecting - how do I fix this?">
+    Common causes and solutions:
+    
+    - **Network issues** - Ensure stable internet connection
+    - **WhatsApp session expired** - Re-scan the QR code
+    - **Rate limiting** - Reduce message sending frequency
+    - **Provider issues** - Check provider status and logs
+    - **Resource constraints** - Ensure adequate server resources
+  </Accordion>
+
+  <Accordion title="How do I debug issues?">
+    BuilderBot provides several debugging options:
+    
+    - Check console logs for error messages
+    - Enable verbose logging in your configuration
+    - Use the provider's debugging tools
+    - Review the documentation for your specific provider
+    - Check the GitHub issues for similar problems
+    - Join the Discord community for help
+  </Accordion>
+
+  <Accordion title="Where can I get help?">
+    Several resources are available:
+    
+    - [Documentation](https://builderbot.app/)
+    - [Discord Community](https://link.codigoencasa.com/DISCORD)
+    - [GitHub Issues](https://github.com/codigoencasa/bot-whatsapp/issues)
+    - [Official Course](https://app.codigoencasa.com/courses/builderbot?refCode=LEIFER)
+    - [YouTube Tutorials](https://www.youtube.com/watch?v=5lEMCeWEJ8o&list=PL_WGMLcL4jzWPhdhcUyhbFU6bC0oJd2BR)
+  </Accordion>
+</AccordionGroup>
+
+## Community & Support
+
+<AccordionGroup>
+  <Accordion title="How can I contribute to BuilderBot?">
+    There are many ways to contribute:
+    
+    - Submit bug reports and feature requests
+    - Contribute code improvements
+    - Improve documentation
+    - Help others in the community
+    - Share your use cases and examples
+    
+    See the [Contributing Guide](/community/contributing) for detailed information.
+  </Accordion>
+
+  <Accordion title="Is there a course or tutorial available?">
+    Yes! There's an official course that covers all features and functions of the library:
+    
+    [BuilderBot Course](https://app.codigoencasa.com/courses/builderbot?refCode=LEIFER)
+    
+    Additionally, there are YouTube tutorials available covering various topics.
+  </Accordion>
+
+  <Accordion title="How can I support the project?">
+    You can support BuilderBot through:
+    
+    - [Open Collective](https://opencollective.com/bot-whatsapp) - Financial contributions
+    - Contributing code and documentation
+    - Helping others in the community
+    - Sharing the project with others
+    - Providing feedback and suggestions
+  </Accordion>
+</AccordionGroup>

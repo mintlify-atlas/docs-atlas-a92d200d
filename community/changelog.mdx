@@ -1,0 +1,282 @@
+---
+title: Changelog
+description: Version history and changes for BuilderBot
+---
+
+## Recent Releases
+
+### Version 1.3.8 (2025-11-26)
+
+Minor update release with stability improvements.
+
+### Version 1.3.7 (2025-11-25)
+
+#### Bug Fixes
+
+- Replace Vercel URL with BuilderBot URL across documentation and branding
+
+### Version 0.1.35 (2024-04-03)
+
+Maintenance release with bug fixes and improvements.
+
+### Version 0.1.0-alpha.18 (2024-01-19)
+
+#### Features
+
+- TypeScript migration continues with enhanced type support
+
+---
+
+## Version 0.1.27 (2023-05-28)
+
+### Features
+
+#### Adapter Improvements
+- Automatically generates timestamp when data is added to the database
+
+#### Provider Enhancements
+- Added support for multiple media types:
+  - Images
+  - Videos
+  - Documents
+  - Stickers
+  - Location data
+  - vCard (contact cards)
+
+### Bug Fixes
+
+- Hot fix for `fotoFlow` and download functionality
+- Added version tracking
+- Meta provider improvements and optimizations
+
+---
+
+## Version 0.1.25 (2023-04-07)
+
+### Features
+
+#### Bot Enhancements
+- Introduced `.addAction` feature for enhanced flow control
+- Improved action handling in conversation flows
+
+#### CLI Updates
+- Added new provider options in the CLI
+- Enhanced provider selection process
+
+#### Provider Updates
+- Updated `wppconnect` starter template
+- Added general `delay` functionality
+- Added `fullPath` support for images
+- Enhanced Meta provider with buttons and lists support
+- Improved download redirect handling
+
+### Bug Fixes
+
+- Fixed MongoDB duplicate INDEX error in adapter
+- Fixed list event calls in provider
+- Updated Meta provider configuration
+- Fixed redirect 306 issues
+
+---
+
+## Version 0.1.23 (2023-02-27)
+
+### Features
+
+#### Infrastructure
+- Implemented pnpm as the package manager across the project
+- Improved build and dependency management
+
+#### Bot Features
+- Added new `goto` event functionality for flow navigation
+- Enhanced flow control and navigation capabilities
+
+#### Provider Updates
+- Implemented QR code display from web page
+- Added event listeners for better provider integration
+- Introduced new wppconnect provider support
+- Enhanced provider event handling
+
+### Bug Fixes
+
+- Added audio conversion support
+- Fixed goto functionality issues
+- Addressed npm audit security warnings
+- Updated CLI installation scripts
+- CLI legacy compatibility fixes
+- Fixed QR code generation issues
+- Enhanced Venom provider audio conversion (MP3 support)
+
+---
+
+## Version 0.1.22 (2023-02-19)
+
+### Features
+
+- Added support for list events
+- Enhanced event listener functionality
+- Improved interactive list handling
+
+---
+
+## Version 0.1.21 (2023-02-12)
+
+### Features
+
+#### Provider Enhancements
+- Added location message support
+- Introduced provider instance access
+- Enhanced raw provider functionality
+- Support for location-based features
+
+### Bug Fixes
+
+- Fixed DialogFlow Essential multiple message handling
+- Improved directory structure handling
+
+---
+
+## Version 0.1.20 (2023-02-05)
+
+### Features
+
+#### CLI Improvements
+- Added regex expression support in `addKeyword`
+- Enhanced keyword matching capabilities
+
+#### Provider Updates
+- Added ability to access provider class directly
+- Enhanced provider extensibility
+
+### Bug Fixes
+
+#### Database
+- Added emoji support in MySQL adapter
+- Fixed database naming conventions
+- Improved character encoding handling
+
+#### Provider
+- Fixed Baileys wa.link handling
+- Improved link processing
+
+#### Testing
+- Enhanced `flowDynamic` testing capabilities
+- Improved test coverage
+
+---
+
+## Version 0.1.19 (2023-01-29)
+
+### Features
+
+#### Media Support
+- Baileys: Added media sending capabilities
+- Enhanced image, video, and document handling
+
+#### Provider Updates
+- Fixed issues in Venom and wwebjs providers
+- Implemented media sending across all providers:
+  - Venom: Full media support
+  - wwebjs: File, video, and audio support
+  - Baileys: Complete media handling
+
+### Bug Fixes
+
+#### Bot
+- Enhanced `endFlow` with context support
+- Fixed `endFlow` behavior with buttons
+- Improved fallback refactoring in child flows
+
+#### CLI
+- Improved `endFlow` functionality
+- Better fallback handling in nested flows
+
+---
+
+## Version 0.1.18 (2023-01-24)
+
+### Features
+
+#### Bot Features
+- Added blacklist functionality
+- Enhanced `flowDynamic` with buttons and media support
+- Improved dynamic flow handling
+
+### Bug Fixes
+
+#### Context Handling
+- Fixed issue #524 related to context management
+- Improved context state handling
+
+#### Provider
+- Upgraded wwebjs to latest version
+- Enhanced provider stability
+
+#### Portal
+- Added @bot-whatsapp/portal to package dependencies
+
+---
+
+## Version 0.1.17 (2023-01-13)
+
+### Features
+
+- Modified starters to enable QR portal
+- Enhanced QR code scanning experience
+
+### Bug Fixes
+
+- Pre-release preparation fixes
+- Corrected starters app.js for portal QR support
+- Added Dockerfile to starters
+
+---
+
+## Earlier Versions
+
+<Accordion title="Version 0.1.3 - 0.1.16 (January 2023)">
+
+### Major Features Introduced
+
+- **QR Portal**: Web-based QR code scanning
+- **Docker Support**: Containerization for easy deployment
+- **Provider Additions**:
+  - Baileys provider
+  - Venom provider
+  - Meta (official WhatsApp) provider
+  - DialogFlow integration
+- **Database Support**:
+  - MySQL adapter
+  - MongoDB adapter
+  - PostgreSQL support
+  - JSON file storage
+- **CLI Enhancements**: Interactive project creation
+- **Media Handling**: Send and receive images, files, buttons
+- **Flow Control**: Enhanced conversation flow management
+
+### Bug Fixes
+
+- Numerous stability improvements
+- Enhanced error handling
+- Better provider compatibility
+- Improved documentation
+
+</Accordion>
+
+---
+
+## Contributing
+
+Want to contribute to BuilderBot? Check out our [Contributing Guide](/community/contributing) to get started.
+
+## Support
+
+For questions or issues, reach out through:
+
+- [Discord Community](https://link.codigoencasa.com/DISCORD)
+- [GitHub Issues](https://github.com/codigoencasa/bot-whatsapp/issues)
+- [Twitter/X](https://twitter.com/leifermendez)
+
+## Full Changelog
+
+For a complete list of all changes, see the [CHANGELOG.md](https://github.com/codigoencasa/bot-whatsapp/blob/main/CHANGELOG.md) file in the repository.

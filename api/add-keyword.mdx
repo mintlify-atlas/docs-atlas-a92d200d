@@ -1,0 +1,265 @@
+---
+title: 'addKeyword'
+description: 'Create a conversation flow triggered by specific keywords or patterns'
+---
+
+## Overview
+
+The `addKeyword` function creates a new conversation flow that is triggered when a user sends a message matching the specified keywords or regex pattern. This is the entry point for creating conversation flows.
+
+## Function Signature
+
+<CodeGroup>
+```typescript TypeScript
+const addKeyword = <P = any, B = any>(
+  keyword: string | [string, ...string[]],
+  options?: ActionPropertiesKeyword
+): TFlow<P, B>
+```
+
+```javascript JavaScript
+const addKeyword = (keyword, options)
+```
+</CodeGroup>
+
+## Parameters
+
+<ParamField path="keyword" type="string | string[]" required>
+  The keyword(s) that trigger this flow. Can be:
+  - A single string: `'hello'`
+  - An array of strings: `['hello', 'hi', 'hey']`
+  - A regex pattern (when `options.regex` is `true`)
+</ParamField>
+
+<ParamField path="options" type="ActionPropertiesKeyword">
+  Optional configuration for keyword matching behavior.
+  
+  <Expandable title="properties">
+    <ParamField path="sensitive" type="boolean" default="false">
+      Enable case-sensitive keyword matching. When `false`, 'Hello' and 'hello' are treated the same.
+    </ParamField>
+    
+    <ParamField path="regex" type="boolean" default="false">
+      Treat the keyword as a regular expression pattern.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="flow" type="TFlow<P, B>">
+  Returns a flow object with the following methods:
+  
+  <Expandable title="methods">
+    <ResponseField name="addAnswer" type="function">
+      Add a response message to the flow. See [addAnswer](/api/add-answer).
+    </ResponseField>
+    
+    <ResponseField name="addAction" type="function">
+      Add a callback action without sending a message. See [addAction](/api/add-action).
+    </ResponseField>
+    
+    <ResponseField name="toJson" type="function">
+      Convert the flow to JSON representation.
+    </ResponseField>
+    
+    <ResponseField name="ref" type="string">
+      Unique reference ID for this flow.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+### Basic Keyword Trigger
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    const welcomeFlow = addKeyword('hello')
+      .addAnswer('Hello! Welcome to our service.')
+      .addAnswer('How can I help you today?')
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    const welcomeFlow = addKeyword('hello')
+      .addAnswer('Hello! Welcome to our service.')
+      .addAnswer('How can I help you today?')
+    ```
+  </Tab>
+</Tabs>
+
+### Multiple Keywords
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    const greetingFlow = addKeyword(['hello', 'hi', 'hey', 'greetings'])
+      .addAnswer('Hi there! Thanks for reaching out.')
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    const greetingFlow = addKeyword(['hello', 'hi', 'hey', 'greetings'])
+      .addAnswer('Hi there! Thanks for reaching out.')
+    ```
+  </Tab>
+</Tabs>
+
+### Case-Sensitive Matching
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    const vipFlow = addKeyword('VIP', { sensitive: true })
+      .addAnswer('Welcome VIP member!')
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    const vipFlow = addKeyword('VIP', { sensitive: true })
+      .addAnswer('Welcome VIP member!')
+    ```
+  </Tab>
+</Tabs>
+
+### Regex Pattern Matching
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    // Matches any message containing a phone number
+    const phoneFlow = addKeyword('\\d{3}-\\d{3}-\\d{4}', { regex: true })
+      .addAnswer('I detected a phone number in your message.')
+
+    // Matches email patterns
+    const emailFlow = addKeyword('[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}', { regex: true })
+      .addAnswer('Thanks for providing your email!')
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    // Matches any message containing a phone number
+    const phoneFlow = addKeyword('\\d{3}-\\d{3}-\\d{4}', { regex: true })
+      .addAnswer('I detected a phone number in your message.')
+
+    // Matches email patterns
+    const emailFlow = addKeyword('[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}', { regex: true })
+      .addAnswer('Thanks for providing your email!')
+    ```
+  </Tab>
+</Tabs>
+
+### Complex Flow with Actions
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    const orderFlow = addKeyword(['order', 'buy'])
+      .addAnswer('Great! Let me help you place an order.')
+      .addAnswer(
+        'What would you like to order?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          await state.update({ orderItem: ctx.body })
+          await flowDynamic(`You selected: ${ctx.body}`)
+        }
+      )
+      .addAnswer(
+        'How many would you like?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          const orderItem = state.get('orderItem')
+          await flowDynamic(`Order: ${ctx.body}x ${orderItem}`)
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    const orderFlow = addKeyword(['order', 'buy'])
+      .addAnswer('Great! Let me help you place an order.')
+      .addAnswer(
+        'What would you like to order?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          await state.update({ orderItem: ctx.body })
+          await flowDynamic(`You selected: ${ctx.body}`)
+        }
+      )
+      .addAnswer(
+        'How many would you like?',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+          const orderItem = state.get('orderItem')
+          await flowDynamic(`Order: ${ctx.body}x ${orderItem}`)
+        }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+## Common Patterns
+
+### Menu Flow
+
+```typescript
+const menuFlow = addKeyword(['menu', 'options'])
+  .addAnswer([
+    'Main Menu:',
+    '1. View Products',
+    '2. Check Order',
+    '3. Contact Support',
+    '4. FAQ'
+  ])
+```
+
+### Help Command
+
+```typescript
+const helpFlow = addKeyword(['help', '?', 'commands'])
+  .addAnswer('Available commands:')
+  .addAnswer('- Type "menu" to see options')
+  .addAnswer('- Type "order" to place an order')
+  .addAnswer('- Type "support" to contact us')
+```
+
+## Notes
+
+- Keywords are matched against the entire message body by default
+- When using multiple keywords, any match will trigger the flow
+- Regex patterns must be properly escaped in strings
+- Case-insensitive matching is the default behavior
+- The flow is only triggered once per keyword match per message
+
+## Related
+
+- [addAnswer](/api/add-answer) - Add responses to your flow
+- [addAction](/api/add-action) - Add callback actions
+- [createFlow](/api/create-flow) - Combine multiple keyword flows

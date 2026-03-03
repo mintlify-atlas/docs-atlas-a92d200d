@@ -1,0 +1,120 @@
+---
+title: sendMessage
+description: Send messages to users through the provider
+---
+
+The `sendMessage` method allows you to send messages directly to users through the bot's provider (WhatsApp, Telegram, etc.). This method is particularly useful when you need to send messages programmatically outside of the normal flow context, such as from HTTP endpoints or scheduled tasks.
+
+## Method Signature
+
+```typescript
+sendMessage<K = any>(userId: string, message: any, args?: any): Promise<K>
+```
+
+<ParamField path="userId" type="string" required>
+  The recipient's identifier (phone number for WhatsApp, user ID for other platforms)
+</ParamField>
+
+<ParamField path="message" type="string" required>
+  The text message to send to the user
+</ParamField>
+
+<ParamField path="args" type="object">
+  Additional options for the message
+  
+  <Expandable title="properties">
+    <ParamField path="media" type="string">
+      URL or local path to media file (image, video, audio, or document)
+    </ParamField>
+    
+    <ParamField path="buttons" type="Button[]">
+      Array of button objects for interactive messages
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="Promise<K>">
+  Returns a promise that resolves with the provider's response after sending the message
+</ResponseField>
+
+## Usage Examples
+
+### Basic Text Message
+
+```typescript
+adapterProvider.server.post(
+  '/v1/messages',
+  handleCtx(async (bot, req, res) => {
+    const { number, message } = req.body
+    await bot.sendMessage(number, message)
+    return res.end('sent')
+  })
+)
+```
+
+### Message with Media
+
+```typescript
+adapterProvider.server.post(
+  '/v1/messages',
+  handleCtx(async (bot, req, res) => {
+    const { number, message, urlMedia } = req.body
+    await bot.sendMessage(number, message, { 
+      media: urlMedia ?? null 
+    })
+    return res.end('sent')
+  })
+)
+```
+
+### Sending Image from Local Path
+
+```typescript
+import { join } from 'path'
+
+await bot.sendMessage('1234567890', 'Check out this image!', {
+  media: join(process.cwd(), 'assets', 'sample.png')
+})
+```
+
+### Sending Multiple Media Types
+
+```typescript
+// Send image
+await bot.sendMessage(userId, 'Here is an image', {
+  media: 'https://example.com/image.jpg'
+})
+
+// Send video
+await bot.sendMessage(userId, 'Here is a video', {
+  media: 'https://example.com/video.mp4'
+})
+
+// Send audio
+await bot.sendMessage(userId, 'Here is an audio', {
+  media: 'https://cdn.example.com/audio.mp3'
+})
+
+// Send document
+await bot.sendMessage(userId, 'Here is a document', {
+  media: 'https://example.com/document.pdf'
+})
+```
+
+## Important Notes
+
+- The `sendMessage` method is available on the `bot` object in HTTP endpoints via `handleCtx`
+- The method bypasses the normal flow logic and sends messages directly through the provider
+- Media files can be provided as URLs or local file paths
+- The actual return type depends on the provider being used (WhatsApp, Telegram, etc.)
+- Messages sent with this method are not tracked in the conversation flow history
+
+## Related Methods
+
+- [dispatch](/api/bot/dispatch) - Trigger flows programmatically
+- [flowDynamic](/api/methods/flow-dynamic) - Send dynamic messages within flows
+
+## See Also
+
+- [HTTP Server](/guides/http-server) - Learn about creating HTTP endpoints
+- [Media Messages](/guides/media-messages) - Complete guide on sending media

@@ -1,0 +1,449 @@
+---
+title: 'addAction'
+description: 'Execute a callback function in a flow without sending a message'
+---
+
+## Overview
+
+The `addAction` method adds a callback function to a conversation flow without sending a message to the user. It's useful for performing background tasks, data processing, API calls, or flow control logic.
+
+## Method Signature
+
+<CodeGroup>
+```typescript TypeScript
+addAction(
+  actionProps: ActionPropertiesGeneric | CallbackFunction<P, B>,
+  cb?: CallbackFunction<P, B>,
+  nested?: TFlow<P, B> | TFlow<P, B>[] | null
+): TFlow<P, B>
+```
+
+```javascript JavaScript
+addAction(actionProps, cb, nested)
+```
+</CodeGroup>
+
+## Parameters
+
+<ParamField path="actionProps" type="ActionPropertiesGeneric | CallbackFunction">
+  Either configuration options or the callback function directly.
+  
+  When passing options object:
+  <Expandable title="properties">
+    <ParamField path="capture" type="boolean" default="false">
+      When `true`, captures the user's next message and passes it to the callback.
+    </ParamField>
+    
+    <ParamField path="delay" type="number" default="0">
+      Delay in milliseconds before executing the action.
+    </ParamField>
+    
+    <ParamField path="idle" type="number" deprecated>
+      Deprecated. Idle timeout in milliseconds.
+    </ParamField>
+    
+    <ParamField path="media" type="string">
+      Media URL or path (typically used with capture).
+    </ParamField>
+    
+    <ParamField path="buttons" type="Button[]">
+      Array of button objects (typically used with capture).
+    </ParamField>
+  </Expandable>
+  
+  When passing a function directly, it becomes the callback.
+</ParamField>
+
+<ParamField path="cb" type="CallbackFunction<P, B>">
+  The callback function to execute (when first parameter is options object).
+  
+  <Expandable title="callback parameters">
+    <ParamField path="ctx" type="BotContext">
+      Message context containing:
+      - `body`: User's message text
+      - `from`: User's phone number/ID
+      - `name`: User's name
+      - Additional provider-specific data
+    </ParamField>
+    
+    <ParamField path="methods" type="BotMethods">
+      Bot control methods:
+      - `flowDynamic(messages)`: Send dynamic messages
+      - `gotoFlow(flow, step?)`: Navigate to another flow
+      - `endFlow(message?)`: End the conversation
+      - `fallBack(message?)`: Return to previous step
+      - `state`: User-specific state management
+      - `globalState`: Global bot state management
+      - `provider`: Provider instance
+      - `database`: Database instance
+      - `blacklist`: Blacklist management
+      - `queue`: Queue management
+      - `extensions`: Custom extensions
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="nested" type="TFlow | TFlow[]">
+  Optional child flow(s) to include in the action's scope.
+</ParamField>
+
+## Return Value
+
+<ResponseField name="flow" type="TFlow<P, B>">
+  Returns the flow object for method chaining.
+</ResponseField>
+
+## Usage Examples
+
+### Simple Action
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { addKeyword } from '@builderbot/bot'
+
+    const flow = addKeyword('start')
+      .addAnswer('Processing your request...')
+      .addAction(async (ctx, { flowDynamic }) => {
+        // Perform background task
+        const result = await someAsyncOperation()
+        await flowDynamic(`Operation completed: ${result}`)
+      })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { addKeyword } = require('@builderbot/bot')
+
+    const flow = addKeyword('start')
+      .addAnswer('Processing your request...')
+      .addAction(async (ctx, { flowDynamic }) => {
+        // Perform background task
+        const result = await someAsyncOperation()
+        await flowDynamic(`Operation completed: ${result}`)
+      })
+    ```
+  </Tab>
+</Tabs>
+
+### Database Operations
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const registerFlow = addKeyword('register')
+      .addAnswer(
+        'What is your email?',
+        { capture: true }
+      )
+      .addAction(async (ctx, { state, database, flowDynamic }) => {
+        // Save to database
+        await database.save({
+          from: ctx.from,
+          email: ctx.body,
+          timestamp: Date.now()
+        })
+        
+        await state.update({ registered: true })
+        await flowDynamic('Registration successful!')
+      })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const registerFlow = addKeyword('register')
+      .addAnswer(
+        'What is your email?',
+        { capture: true }
+      )
+      .addAction(async (ctx, { state, database, flowDynamic }) => {
+        // Save to database
+        await database.save({
+          from: ctx.from,
+          email: ctx.body,
+          timestamp: Date.now()
+        })
+        
+        await state.update({ registered: true })
+        await flowDynamic('Registration successful!')
+      })
+    ```
+  </Tab>
+</Tabs>
+
+### API Integration
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const lookupFlow = addKeyword('lookup')
+      .addAnswer('Please enter the order ID:', { capture: true })
+      .addAction(async (ctx, { flowDynamic }) => {
+        const orderId = ctx.body
+        
+        try {
+          const response = await fetch(`https://api.example.com/orders/${orderId}`)
+          const order = await response.json()
+          
+          await flowDynamic([
+            `Order Status: ${order.status}`,
+            `Items: ${order.items.length}`,
+            `Total: $${order.total}`
+          ])
+        } catch (error) {
+          await flowDynamic('Order not found. Please check the ID.')
+        }
+      })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const lookupFlow = addKeyword('lookup')
+      .addAnswer('Please enter the order ID:', { capture: true })
+      .addAction(async (ctx, { flowDynamic }) => {
+        const orderId = ctx.body
+        
+        try {
+          const response = await fetch(`https://api.example.com/orders/${orderId}`)
+          const order = await response.json()
+          
+          await flowDynamic([
+            `Order Status: ${order.status}`,
+            `Items: ${order.items.length}`,
+            `Total: $${order.total}`
+          ])
+        } catch (error) {
+          await flowDynamic('Order not found. Please check the ID.')
+        }
+      })
+    ```
+  </Tab>
+</Tabs>
+
+### Flow Control
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const premiumFlow = addKeyword('premium')
+      .addAnswer('Premium features...')
+
+    const freeFlow = addKeyword('free')
+      .addAnswer('Free features...')
+
+    const checkSubscription = addKeyword('features')
+      .addAction(async (ctx, { gotoFlow, database }) => {
+        const user = await database.findOne({ phone: ctx.from })
+        
+        if (user?.subscription === 'premium') {
+          return gotoFlow(premiumFlow)
+        }
+        return gotoFlow(freeFlow)
+      })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const premiumFlow = addKeyword('premium')
+      .addAnswer('Premium features...')
+
+    const freeFlow = addKeyword('free')
+      .addAnswer('Free features...')
+
+    const checkSubscription = addKeyword('features')
+      .addAction(async (ctx, { gotoFlow, database }) => {
+        const user = await database.findOne({ phone: ctx.from })
+        
+        if (user?.subscription === 'premium') {
+          return gotoFlow(premiumFlow)
+        }
+        return gotoFlow(freeFlow)
+      })
+    ```
+  </Tab>
+</Tabs>
+
+### With Capture Option
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const validateFlow = addKeyword('validate')
+      .addAnswer('Please enter your code:')
+      .addAction(
+        { capture: true },
+        async (ctx, { flowDynamic, endFlow }) => {
+          const code = ctx.body
+          const isValid = await validateCode(code)
+          
+          if (isValid) {
+            await flowDynamic('Code verified successfully!')
+          } else {
+            await flowDynamic('Invalid code. Please try again.')
+            return endFlow()
+          }
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const validateFlow = addKeyword('validate')
+      .addAnswer('Please enter your code:')
+      .addAction(
+        { capture: true },
+        async (ctx, { flowDynamic, endFlow }) => {
+          const code = ctx.body
+          const isValid = await validateCode(code)
+          
+          if (isValid) {
+            await flowDynamic('Code verified successfully!')
+          } else {
+            await flowDynamic('Invalid code. Please try again.')
+            return endFlow()
+          }
+        }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### State Management
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const cartFlow = addKeyword('cart')
+      .addAnswer('What would you like to add?', { capture: true })
+      .addAction(async (ctx, { state, flowDynamic }) => {
+        // Get current cart
+        const cart = state.get<string[]>('cart') || []
+        
+        // Add item
+        cart.push(ctx.body)
+        await state.update({ cart })
+        
+        await flowDynamic(`Added "${ctx.body}" to cart. Total items: ${cart.length}`)
+      })
+      .addAnswer('Add another item?', { capture: true })
+      .addAction(async (ctx, { state, flowDynamic, endFlow }) => {
+        if (ctx.body.toLowerCase() === 'no') {
+          const cart = state.get<string[]>('cart')
+          await flowDynamic(`Final cart: ${cart.join(', ')}`)
+          return endFlow()
+        }
+      })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const cartFlow = addKeyword('cart')
+      .addAnswer('What would you like to add?', { capture: true })
+      .addAction(async (ctx, { state, flowDynamic }) => {
+        // Get current cart
+        const cart = state.get('cart') || []
+        
+        // Add item
+        cart.push(ctx.body)
+        await state.update({ cart })
+        
+        await flowDynamic(`Added "${ctx.body}" to cart. Total items: ${cart.length}`)
+      })
+      .addAnswer('Add another item?', { capture: true })
+      .addAction(async (ctx, { state, flowDynamic, endFlow }) => {
+        if (ctx.body.toLowerCase() === 'no') {
+          const cart = state.get('cart')
+          await flowDynamic(`Final cart: ${cart.join(', ')}`)
+          return endFlow()
+        }
+      })
+    ```
+  </Tab>
+</Tabs>
+
+### Delayed Action
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const reminderFlow = addKeyword('remind')
+      .addAnswer('Setting up your reminder...')
+      .addAction(
+        { delay: 5000 }, // Wait 5 seconds
+        async (ctx, { flowDynamic }) => {
+          await flowDynamic('This is your reminder!')
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const reminderFlow = addKeyword('remind')
+      .addAnswer('Setting up your reminder...')
+      .addAction(
+        { delay: 5000 }, // Wait 5 seconds
+        async (ctx, { flowDynamic }) => {
+          await flowDynamic('This is your reminder!')
+        }
+      )
+    ```
+  </Tab>
+</Tabs>
+
+### Blacklist Management
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const blockFlow = addKeyword('block')
+      .addAnswer('Enter phone number to block:', { capture: true })
+      .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        const phoneToBlock = ctx.body
+        blacklist.add(phoneToBlock)
+        await flowDynamic(`Blocked ${phoneToBlock}`)
+      })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const blockFlow = addKeyword('block')
+      .addAnswer('Enter phone number to block:', { capture: true })
+      .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        const phoneToBlock = ctx.body
+        blacklist.add(phoneToBlock)
+        await flowDynamic(`Blocked ${phoneToBlock}`)
+      })
+    ```
+  </Tab>
+</Tabs>
+
+## Key Differences from addAnswer
+
+| Feature | addAnswer | addAction |
+|---------|-----------|----------|
+| Sends message | Yes | No |
+| Executes callback | Optional | Required |
+| Use case | Respond to user | Background processing |
+| Visibility | User sees message | Silent operation |
+
+## Notes
+
+- `addAction` does not send any message by default - use `flowDynamic()` to send messages from within the callback
+- Perfect for data validation, API calls, database operations, and flow control
+- When `capture: true`, the action waits for user input before executing
+- Callbacks are async-compatible - always use `async/await` for asynchronous operations
+- Use `endFlow()` to stop the conversation, `fallBack()` to return to previous step
+- State changes persist across the conversation for the same user
+
+## Related
+
+- [addAnswer](/api/add-answer) - Send messages with optional callbacks
+- [addKeyword](/api/add-keyword) - Create conversation flows

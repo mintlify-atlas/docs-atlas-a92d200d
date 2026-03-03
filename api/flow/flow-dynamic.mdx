@@ -1,0 +1,373 @@
+---
+title: flowDynamic
+description: Send dynamic messages programmatically during flow execution
+---
+
+The `flowDynamic` method allows you to send messages programmatically during flow execution, enabling dynamic responses based on runtime data, API calls, or business logic.
+
+## Signature
+
+```typescript
+flowDynamic(
+  messages: string | string[] | FlowDynamicMessage[],
+  options?: { delay?: number }
+): Promise<void>
+```
+
+## Parameters
+
+<ParamField path="messages" type="string | string[] | FlowDynamicMessage[]" required>
+  The message(s) to send. Can be:
+  - A single string
+  - An array of strings
+  - An array of message objects with media, buttons, and delay options
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  Configuration options for message sending.
+  
+  <ParamField path="options.delay" type="number" optional>
+    Delay in milliseconds before sending the message.
+  </ParamField>
+</ParamField>
+
+## FlowDynamicMessage Type
+
+```typescript
+type FlowDynamicMessage = {
+  body?: string          // Message text
+  media?: string         // URL or path to media file
+  buttons?: Button[]     // Array of button objects
+  delay?: number         // Delay before sending (ms)
+}
+```
+
+## Return Value
+
+Returns a `Promise<void>` that resolves when all messages are sent.
+
+## Usage Examples
+
+### Basic Text Messages
+
+Send simple dynamic text:
+
+```typescript
+const greetingFlow = addKeyword('hello')
+  .addAction(async (ctx, { flowDynamic }) => {
+    const userName = await getUserName(ctx.from)
+    await flowDynamic(`Welcome back, ${userName}!`)
+  })
+```
+
+### Multiple Messages
+
+Send a sequence of messages:
+
+```typescript
+const infoFlow = addKeyword('info')
+  .addAction(async (ctx, { flowDynamic }) => {
+    await flowDynamic([
+      'Here is your information:',
+      `Name: ${ctx.name}`,
+      `Phone: ${ctx.from}`,
+      'Thank you!'
+    ])
+  })
+```
+
+### Messages with Media
+
+Send images, videos, or files:
+
+```typescript
+const catalogFlow = addKeyword('catalog')
+  .addAction(async (ctx, { flowDynamic }) => {
+    const products = await getProducts()
+    
+    const messages = products.map(product => ({
+      body: `${product.name} - $${product.price}`,
+      media: product.imageUrl
+    }))
+    
+    await flowDynamic(messages)
+  })
+```
+
+### Messages with Delays
+
+Add delays between messages for better UX:
+
+```typescript
+const typingFlow = addKeyword('status')
+  .addAction(async (ctx, { flowDynamic }) => {
+    await flowDynamic([
+      { body: 'Checking your order...', delay: 0 },
+      { body: 'Processing...', delay: 1000 },
+      { body: 'Your order is ready!', delay: 2000 }
+    ])
+  })
+```
+
+### API Integration
+
+Fetch and display data from external APIs:
+
+```typescript
+const weatherFlow = addKeyword('weather')
+  .addAnswer(
+    'Which city?',
+    { capture: true },
+    async (ctx, { flowDynamic }) => {
+      const city = ctx.body
+      const weather = await fetchWeather(city)
+      
+      await flowDynamic([
+        `Weather in ${city}:`,
+        `Temperature: ${weather.temp}°C`,
+        `Conditions: ${weather.description}`,
+        { 
+          body: 'Current conditions',
+          media: weather.iconUrl 
+        }
+      ])
+    }
+  )
+```
+
+### Database Queries
+
+Display data from database:
+
+```typescript
+const ordersFlow = addKeyword('my orders')
+  .addAction(async (ctx, { flowDynamic }) => {
+    const orders = await getOrdersByPhone(ctx.from)
+    
+    if (orders.length === 0) {
+      await flowDynamic('You have no orders yet.')
+      return
+    }
+    
+    const messages = orders.map((order, index) => 
+      `${index + 1}. Order #${order.id} - $${order.total} - ${order.status}`
+    )
+    
+    await flowDynamic(['Your orders:', ...messages])
+  })
+```
+
+### Conditional Messages
+
+Send different messages based on conditions:
+
+```typescript
+const balanceFlow = addKeyword('balance')
+  .addAction(async (ctx, { flowDynamic }) => {
+    const balance = await getBalance(ctx.from)
+    
+    if (balance < 0) {
+      await flowDynamic([
+        `Your balance is $${balance}`,
+        '⚠️ Your account is overdrawn',
+        'Please make a payment soon'
+      ])
+    } else if (balance < 100) {
+      await flowDynamic([
+        `Your balance is $${balance}`,
+        '💡 Your balance is running low'
+      ])
+    } else {
+      await flowDynamic(`Your balance is $${balance}`)
+    }
+  })
+```
+
+### Personalized Messages
+
+Combine with state for personalization:
+
+```typescript
+const recommendFlow = addKeyword('recommend')
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    const userPrefs = state.getMyState()
+    const recommendations = await getRecommendations(userPrefs)
+    
+    await flowDynamic('Based on your preferences:')
+    
+    for (const item of recommendations) {
+      await flowDynamic({
+        body: `${item.name} - ${item.description}`,
+        media: item.image,
+        delay: 500
+      })
+    }
+  })
+```
+
+### Progress Updates
+
+Show progress during long operations:
+
+```typescript
+const processFlow = addKeyword('process')
+  .addAction(async (ctx, { flowDynamic }) => {
+    await flowDynamic('Starting process...')
+    
+    await step1()
+    await flowDynamic('✅ Step 1 complete')
+    
+    await step2()
+    await flowDynamic('✅ Step 2 complete')
+    
+    await step3()
+    await flowDynamic('✅ All steps completed!')
+  })
+```
+
+### Error Handling
+
+Handle errors gracefully:
+
+```typescript
+const searchFlow = addKeyword('search')
+  .addAnswer(
+    'What are you looking for?',
+    { capture: true },
+    async (ctx, { flowDynamic }) => {
+      try {
+        const results = await searchProducts(ctx.body)
+        
+        if (results.length === 0) {
+          await flowDynamic('No results found. Try different keywords.')
+          return
+        }
+        
+        await flowDynamic(`Found ${results.length} results:`)
+        await flowDynamic(results.map(r => r.name))
+        
+      } catch (error) {
+        await flowDynamic('Sorry, search is temporarily unavailable.')
+      }
+    }
+  )
+```
+
+### Combining with Other Methods
+
+Use with gotoFlow for advanced patterns:
+
+```typescript
+const checkoutFlow = addKeyword('checkout')
+  .addAction(async (ctx, { flowDynamic, gotoFlow, state }) => {
+    const cart = state.get('cart') || []
+    
+    if (cart.length === 0) {
+      await flowDynamic('Your cart is empty')
+      return gotoFlow(shopFlow)
+    }
+    
+    const total = cart.reduce((sum, item) => sum + item.price, 0)
+    
+    await flowDynamic([
+      'Cart Summary:',
+      ...cart.map(item => `- ${item.name}: $${item.price}`),
+      `Total: $${total}`
+    ])
+    
+    return gotoFlow(paymentFlow)
+  })
+```
+
+## Important Notes
+
+<Warning>
+  **Message Limits**: Sending too many messages rapidly may trigger rate limits or spam filters. Use delays between messages.
+</Warning>
+
+<Note>
+  - `flowDynamic` is **asynchronous** - always use `await`
+  - Messages are sent in the order they appear in the array
+  - Media URLs must be publicly accessible or local file paths
+  - The method supports up to 5 messages per call (recommended)
+  - Delays are cumulative when using message objects
+</Note>
+
+## Message Formatting Tips
+
+### Text Formatting
+
+```typescript
+await flowDynamic([
+  '*Bold text*',
+  '_Italic text_',
+  '~Strikethrough~',
+  '```Monospace```'
+])
+```
+
+### Lists and Structure
+
+```typescript
+await flowDynamic([
+  'Menu Options:',
+  '1️⃣ First option',
+  '2️⃣ Second option',
+  '3️⃣ Third option',
+  '',
+  'Reply with the number to select'
+])
+```
+
+## Common Patterns
+
+### Pagination
+
+```typescript
+const listFlow = addKeyword('list')
+  .addAction(async (ctx, { flowDynamic, state }) => {
+    const items = await getAllItems()
+    const page = state.get('page') || 0
+    const pageSize = 5
+    
+    const pageItems = items.slice(page * pageSize, (page + 1) * pageSize)
+    
+    await flowDynamic([
+      `Page ${page + 1} of ${Math.ceil(items.length / pageSize)}:`,
+      ...pageItems.map((item, i) => `${i + 1}. ${item.name}`)
+    ])
+  })
+```
+
+### Template Messages
+
+```typescript
+const notifyFlow = addKeyword('notify')
+  .addAction(async (ctx, { flowDynamic }) => {
+    const template = {
+      header: '🔔 Notification',
+      body: 'You have a new message',
+      footer: 'Reply STOP to unsubscribe'
+    }
+    
+    await flowDynamic([
+      template.header,
+      template.body,
+      '',
+      template.footer
+    ])
+  })
+```
+
+## Performance Considerations
+
+- **Batch operations**: Prepare all data before calling `flowDynamic`
+- **Use delays wisely**: Don't make users wait unnecessarily
+- **Limit message count**: Send 3-5 messages max per `flowDynamic` call
+- **Cache external data**: Avoid repeated API calls
+
+## Related Methods
+
+- [`gotoFlow`](/api/flow/goto-flow) - Navigate to a different flow
+- [`endFlow`](/api/flow/end-flow) - End the conversation flow
+- [`fallBack`](/api/flow/fall-back) - Repeat the previous message

@@ -1,0 +1,204 @@
+---
+title: gotoFlow
+description: Navigate to a different flow in your bot conversation
+---
+
+The `gotoFlow` method allows you to redirect the conversation to a completely different flow, ending the current flow and starting a new one.
+
+## Signature
+
+```typescript
+gotoFlow(flow: TFlow, step?: number): Promise<void>
+```
+
+## Parameters
+
+<ParamField path="flow" type="TFlow" required>
+  The flow instance to navigate to. Must be a valid flow created with `addKeyword`.
+</ParamField>
+
+<ParamField path="step" type="number" default="0">
+  The step index to start from in the target flow. Defaults to `0` (first step).
+</ParamField>
+
+## Return Value
+
+Returns a `Promise<void>` that resolves when the flow transition is complete.
+
+## How It Works
+
+1. **Stops current flow** - Immediately ends the current flow execution
+2. **Clears conversation queue** - Removes any pending messages from the current flow
+3. **Starts new flow** - Begins executing the target flow from the specified step
+4. **Sets flow context** - Updates the conversation context to the new flow
+
+## Usage Examples
+
+### Basic Flow Navigation
+
+Redirect users to a registration flow after they confirm interest:
+
+```typescript
+const registerFlow = addKeyword('register')
+  .addAnswer('What is your name?', { capture: true }, async (ctx, { state }) => {
+    await state.update({ name: ctx.body })
+  })
+  .addAnswer('What is your email?', { capture: true }, async (ctx, { state }) => {
+    await state.update({ email: ctx.body })
+  })
+
+const welcomeFlow = addKeyword('hi')
+  .addAnswer('Welcome! Would you like to register?')
+  .addAnswer(
+    'Reply "yes" to continue',
+    { capture: true },
+    async (ctx, { gotoFlow }) => {
+      if (ctx.body.toLowerCase().includes('yes')) {
+        return gotoFlow(registerFlow)
+      }
+    }
+  )
+```
+
+### Conditional Flow Routing
+
+Route users to different flows based on their input:
+
+```typescript
+const supportFlow = addKeyword('support')
+  .addAnswer('Our support team will help you...')
+
+const salesFlow = addKeyword('sales')
+  .addAnswer('Let me connect you with sales...')
+
+const menuFlow = addKeyword('menu')
+  .addAnswer(
+    ['What do you need?', '1. Support', '2. Sales'].join('\n'),
+    { capture: true },
+    async (ctx, { gotoFlow }) => {
+      if (ctx.body === '1') {
+        return gotoFlow(supportFlow)
+      }
+      if (ctx.body === '2') {
+        return gotoFlow(salesFlow)
+      }
+    }
+  )
+```
+
+### Starting from Specific Step
+
+Skip initial steps when navigating to a flow:
+
+```typescript
+const checkoutFlow = addKeyword('checkout')
+  .addAnswer('Step 1: Choose payment method')
+  .addAnswer('Step 2: Enter payment details')
+  .addAnswer('Step 3: Confirm purchase')
+
+const cartFlow = addKeyword('cart')
+  .addAnswer(
+    'You have items in cart. Proceed to checkout?',
+    { capture: true },
+    async (ctx, { gotoFlow }) => {
+      if (ctx.body.toLowerCase() === 'yes') {
+        // Start at step 1 (skip step 0)
+        return gotoFlow(checkoutFlow, 1)
+      }
+    }
+  )
+```
+
+### Using with Dynamic Flows
+
+Combine `gotoFlow` with `flowDynamic` for smooth transitions:
+
+```typescript
+const helpFlow = addKeyword('help')
+  .addAnswer('Here are the help topics...')
+
+const mainFlow = addKeyword('start')
+  .addAnswer(
+    'Welcome!',
+    null,
+    async (ctx, { flowDynamic, gotoFlow }) => {
+      await flowDynamic('Let me redirect you to help')
+      return gotoFlow(helpFlow)
+    }
+  )
+```
+
+## Important Notes
+
+<Warning>
+  **Circular Dependencies**: When using `gotoFlow`, avoid circular dependencies by using `require()` to import flows:
+  
+  ```typescript
+  // Good
+  return gotoFlow(require('./flows/registerFlow'))
+  
+  // Avoid
+  return gotoFlow(registerFlow) // May cause circular dependency errors
+  ```
+</Warning>
+
+<Note>
+  - `gotoFlow` **clears the queue** and **ends the current flow**
+  - The target flow must be a valid flow instance with a `toJson()` method
+  - State data persists across flows - use `state.clear()` if needed
+  - Any messages in the current flow queue will be discarded
+</Note>
+
+## Common Patterns
+
+### Multi-Step Wizard
+
+```typescript
+const step3Flow = addKeyword(utils.setEvent('STEP_3'))
+  .addAnswer('Final step completed!')
+
+const step2Flow = addKeyword(utils.setEvent('STEP_2'))
+  .addAnswer(
+    'Step 2: Enter your age',
+    { capture: true },
+    async (ctx, { state, gotoFlow }) => {
+      await state.update({ age: ctx.body })
+      return gotoFlow(step3Flow)
+    }
+  )
+
+const step1Flow = addKeyword('start')
+  .addAnswer(
+    'Step 1: Enter your name',
+    { capture: true },
+    async (ctx, { state, gotoFlow }) => {
+      await state.update({ name: ctx.body })
+      return gotoFlow(step2Flow)
+    }
+  )
+```
+
+### Error Handling Flow
+
+```typescript
+const errorFlow = addKeyword(utils.setEvent('ERROR'))
+  .addAnswer('Something went wrong. Please try again.')
+
+const processFlow = addKeyword('process')
+  .addAction(
+    async (ctx, { gotoFlow }) => {
+      try {
+        // Process logic
+        await someOperation()
+      } catch (error) {
+        return gotoFlow(errorFlow)
+      }
+    }
+  )
+```
+
+## Related Methods
+
+- [`endFlow`](/api/flow/end-flow) - End the conversation flow
+- [`fallBack`](/api/flow/fall-back) - Repeat the previous message
+- [`flowDynamic`](/api/flow/flow-dynamic) - Send dynamic messages

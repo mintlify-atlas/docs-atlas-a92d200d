@@ -1,0 +1,518 @@
+---
+title: Event System
+description: Understanding the event system and custom events in BuilderBot
+---
+
+## What are Events?
+
+Events in BuilderBot are special triggers that activate flows without requiring user input. They enable:
+
+- **Programmatic flow activation** via API or internal logic
+- **System event handling** (welcome messages, media detection, etc.)
+- **Custom event triggers** for specific business logic
+
+## Event Types
+
+BuilderBot provides several built-in events:
+
+### Built-in Events
+
+```typescript
+const LIST_ALL = {
+  WELCOME: eventWelcome(),
+  MEDIA: eventMedia(),
+  LOCATION: eventLocation(),
+  DOCUMENT: eventDocument(),
+  VOICE_NOTE: eventVoiceNote(),
+  ACTION: eventAction(),
+  ORDER: eventOrder(),
+  TEMPLATE: eventTemplate(),
+  CALL: eventCall(),
+}
+```
+
+Each event generates a unique identifier:
+
+```typescript
+import { generateRef } from '../../utils/hash'
+
+const eventWelcome = (): string => {
+  return generateRef('_event_welcome_')
+}
+
+const eventMedia = (): string => {
+  return generateRef('_event_media_')
+}
+
+const eventVoiceNote = (): string => {
+  return generateRef('_event_voice_note_')
+}
+```
+
+### Event Regex Patterns
+
+Events can be matched using regex patterns:
+
+```typescript
+const LIST_REGEX = {
+  REGEX_EVENT_DOCUMENT,
+  REGEX_EVENT_LOCATION,
+  REGEX_EVENT_MEDIA,
+  REGEX_EVENT_VOICE_NOTE,
+  REGEX_EVENT_ORDER,
+  REGEX_EVENT_TEMPLATE,
+  REGEX_EVENT_CUSTOM,
+  REGEX_EVENT_CALL,
+}
+```
+
+Example regex generation:
+
+```typescript
+import { generateRef, generateRegex } from '../../utils/hash'
+
+const eventMedia = (): string => {
+  return generateRef('_event_media_')
+}
+
+const REGEX_EVENT_MEDIA = generateRegex(`_event_media`)
+```
+
+## Using Built-in Events
+
+### WELCOME Event
+
+Trigger a flow when a user first interacts:
+
+```typescript
+import { addKeyword, EVENTS } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(EVENTS.WELCOME)
+  .addAnswer('Welcome! This is your first time here.')
+  .addAnswer('How can we help you today?')
+```
+
+### MEDIA Event
+
+Detect when users send images, videos, or other media:
+
+```typescript
+import { addKeyword, EVENTS } from '@builderbot/bot'
+
+const mediaFlow = addKeyword(EVENTS.MEDIA)
+  .addAnswer('Thanks for sending media!')
+  .addAction(async (ctx, { provider }) => {
+    const filePath = await provider.saveFile(ctx, { path: './downloads' })
+    console.log('Media saved to:', filePath)
+  })
+```
+
+### VOICE_NOTE Event
+
+Handle voice messages:
+
+```typescript
+const voiceFlow = addKeyword(EVENTS.VOICE_NOTE)
+  .addAnswer('Processing your voice note...')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    const audioPath = await provider.saveFile(ctx)
+    // Process audio file (transcription, etc.)
+    await flowDynamic('Voice note received!')
+  })
+```
+
+### DOCUMENT Event
+
+Handle document uploads:
+
+```typescript
+const documentFlow = addKeyword(EVENTS.DOCUMENT)
+  .addAnswer('Document received. Processing...')
+  .addAction(async (ctx, { provider }) => {
+    const docPath = await provider.saveFile(ctx, { path: './documents' })
+    console.log('Document saved:', docPath)
+  })
+```
+
+### LOCATION Event
+
+Handle location sharing:
+
+```typescript
+const locationFlow = addKeyword(EVENTS.LOCATION)
+  .addAction(async (ctx, { flowDynamic }) => {
+    const { latitude, longitude } = ctx.body
+    await flowDynamic(`Location received: ${latitude}, ${longitude}`)
+  })
+```
+
+## Custom Events
+
+Create custom events for programmatic flow triggering:
+
+### Creating Custom Events
+
+```typescript
+import { addKeyword, utils } from '@builderbot/bot'
+
+const registerFlow = addKeyword(utils.setEvent('REGISTER_FLOW'))
+  .addAnswer('Starting registration...')
+  .addAnswer(
+    'What is your name?',
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ name: ctx.body })
+    }
+  )
+```
+
+### Triggering Custom Events
+
+<Tabs>
+  <Tab title="Via API Endpoint">
+    ```typescript
+    adapterProvider.server.post(
+      '/v1/register',
+      handleCtx(async (bot, req, res) => {
+        const { number, name } = req.body
+        
+        // Dispatch custom event
+        await bot.dispatch('REGISTER_FLOW', {
+          from: number,
+          name: name
+        })
+        
+        return res.end('Registration started')
+      })
+    )
+    ```
+    
+    **API Call:**
+    ```bash
+    curl -X POST http://localhost:3008/v1/register \
+      -H "Content-Type: application/json" \
+      -d '{"number": "1234567890", "name": "John"}'
+    ```
+  </Tab>
+  
+  <Tab title="Internal Dispatch">
+    ```typescript
+    const menuFlow = addKeyword('menu')
+      .addAnswer(
+        'Select option:\n1. Register\n2. Support',
+        { capture: true },
+        async (ctx, { gotoFlow }) => {
+          if (ctx.body === '1') {
+            // Trigger registration event
+            return gotoFlow(registerFlow)
+          }
+        }
+      )
+    ```
+  </Tab>
+  
+  <Tab title="Provider Dispatch">
+    ```typescript
+    adapterProvider.dispatchInside({
+      from: '1234567890',
+      name: 'John Doe',
+      body: utils.setEvent('REGISTER_FLOW')
+    })
+    ```
+  </Tab>
+</Tabs>
+
+## Event Utilities
+
+### setEvent
+
+Create an event identifier:
+
+```typescript
+import { utils } from '@builderbot/bot'
+
+const customEvent = utils.setEvent('MY_CUSTOM_EVENT')
+// Returns: '__event__MY_CUSTOM_EVENT'
+```
+
+### removePlus
+
+Normalize phone numbers:
+
+```typescript
+import { removePlus } from '../../utils/event'
+
+const normalized = removePlus('+1234567890')
+// Returns: '1234567890'
+```
+
+## Provider Event Types
+
+Providers emit several event types:
+
+```typescript
+type ProviderEventTypes = {
+  message: [arg1: BotContext]
+  require_action: [arg1: {
+    title: string
+    instructions: string[]
+    payload?: { qr?: string; code?: string; [key: string]: any }
+  }]
+  notice: [arg1: { title: string; instructions: string[] }]
+  ready: any
+  auth_failure: any
+  host: any
+  [key: string]: any
+}
+```
+
+### Listening to Provider Events
+
+```typescript
+adapterProvider.on('ready', () => {
+  console.log('Bot is ready!')
+})
+
+adapterProvider.on('message', (ctx) => {
+  console.log('Incoming message:', ctx.body)
+})
+
+adapterProvider.on('require_action', ({ title, instructions, payload }) => {
+  console.log(title)
+  if (payload?.qr) {
+    console.log('QR Code:', payload.qr)
+  }
+})
+
+adapterProvider.on('notice', ({ title, instructions }) => {
+  console.log(`[${title}]`)
+  instructions.forEach(line => console.log(line))
+})
+```
+
+## Practical Examples
+
+### Welcome Message on First Contact
+
+```typescript
+import { addKeyword, EVENTS } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(EVENTS.WELCOME)
+  .addAnswer('👋 Welcome to our service!')
+  .addAnswer(
+    'This is your first time here. What would you like to do?\n1. Learn More\n2. Get Started',
+    { capture: true },
+    async (ctx, { gotoFlow }) => {
+      if (ctx.body === '1') return gotoFlow(learnMoreFlow)
+      if (ctx.body === '2') return gotoFlow(onboardingFlow)
+    },
+    [learnMoreFlow, onboardingFlow]
+  )
+```
+
+### Scheduled Event Trigger
+
+```typescript
+import { addKeyword, utils } from '@builderbot/bot'
+import cron from 'node-cron'
+
+const reminderFlow = addKeyword(utils.setEvent('DAILY_REMINDER'))
+  .addAnswer('Good morning! Here is your daily reminder.')
+  .addAnswer('Don\'t forget to check your tasks for today.')
+
+// Schedule event every day at 9 AM
+cron.schedule('0 9 * * *', async () => {
+  const users = ['1234567890', '0987654321'] // From your database
+  
+  for (const user of users) {
+    adapterProvider.dispatchInside({
+      from: user,
+      name: 'System',
+      body: utils.setEvent('DAILY_REMINDER')
+    })
+  }
+})
+```
+
+### Multi-Event Flow
+
+```typescript
+const supportFlow = addKeyword([
+  'support',
+  'help',
+  utils.setEvent('SUPPORT_REQUEST')
+])
+  .addAnswer('Support team has been notified.')
+  .addAnswer('Please describe your issue:')
+  .addAnswer(
+    null,
+    { capture: true },
+    async (ctx, { state }) => {
+      await state.update({ issue: ctx.body })
+      // Notify support team
+    }
+  )
+```
+
+### Media Processing Pipeline
+
+```typescript
+import { addKeyword, EVENTS } from '@builderbot/bot'
+
+const imageFlow = addKeyword(EVENTS.MEDIA)
+  .addAnswer('Image received! Processing...')
+  .addAction(async (ctx, { provider, flowDynamic, state }) => {
+    try {
+      // Save the image
+      const imagePath = await provider.saveFile(ctx, {
+        path: './uploads/images'
+      })
+      
+      await state.update({ lastImage: imagePath })
+      
+      // Process image (AI analysis, etc.)
+      // const analysis = await analyzeImage(imagePath)
+      
+      await flowDynamic('Image processed successfully!')
+    } catch (error) {
+      await flowDynamic('Error processing image. Please try again.')
+    }
+  })
+
+const voiceFlow = addKeyword(EVENTS.VOICE_NOTE)
+  .addAnswer('Voice note received! Transcribing...')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    const audioPath = await provider.saveFile(ctx, {
+      path: './uploads/audio'
+    })
+    
+    // Transcribe audio
+    // const transcript = await transcribeAudio(audioPath)
+    
+    await flowDynamic('Transcription: [...]')
+  })
+```
+
+### Webhook-Triggered Events
+
+```typescript
+// Define event flow
+const orderConfirmationFlow = addKeyword(utils.setEvent('ORDER_CONFIRMED'))
+  .addAction(async (ctx, { flowDynamic, state }) => {
+    const orderDetails = state.get('orderDetails')
+    
+    await flowDynamic([
+      'Your order has been confirmed!',
+      `Order ID: ${orderDetails.id}`,
+      `Total: $${orderDetails.total}`,
+      'Expected delivery: 2-3 business days'
+    ])
+  })
+
+// Webhook endpoint
+adapterProvider.server.post(
+  '/webhook/order-confirmed',
+  handleCtx(async (bot, req, res) => {
+    const { customerId, orderId, total } = req.body
+    
+    // Update state with order details
+    await bot.state(customerId).update({
+      orderDetails: { id: orderId, total }
+    })
+    
+    // Trigger event
+    await bot.dispatch('ORDER_CONFIRMED', {
+      from: customerId,
+      name: 'System'
+    })
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    return res.end(JSON.stringify({ status: 'ok' }))
+  })
+)
+```
+
+### Conditional Event Routing
+
+```typescript
+const actionFlow = addKeyword(EVENTS.ACTION)
+  .addAction(async (ctx, { flowDynamic, globalState }) => {
+    const maintenanceMode = globalState.get('maintenanceMode')
+    
+    if (maintenanceMode) {
+      return flowDynamic('System is under maintenance. Please try later.')
+    }
+    
+    // Normal processing
+    await flowDynamic('Processing your request...')
+  })
+```
+
+## Event Flow with State
+
+```typescript
+import { addKeyword, utils } from '@builderbot/bot'
+
+const checkoutFlow = addKeyword(utils.setEvent('START_CHECKOUT'))
+  .addAction(async (ctx, { state, flowDynamic }) => {
+    const cart = state.get('cart') || []
+    
+    if (cart.length === 0) {
+      return flowDynamic('Your cart is empty!')
+    }
+    
+    const total = cart.reduce((sum, item) => sum + item.price, 0)
+    await state.update({ checkoutTotal: total })
+    
+    await flowDynamic(`Total: $${total}. Proceed? (yes/no)`)
+  })
+  .addAnswer(
+    null,
+    { capture: true },
+    async (ctx, { state, gotoFlow }) => {
+      if (ctx.body.toLowerCase() === 'yes') {
+        return gotoFlow(paymentFlow)
+      }
+    }
+  )
+```
+
+## Best Practices
+
+<Tip>
+  **Event Naming**: Use descriptive, uppercase names for custom events:
+  ```typescript
+  utils.setEvent('ORDER_CONFIRMED')
+  utils.setEvent('PAYMENT_FAILED')
+  utils.setEvent('USER_REGISTERED')
+  ```
+</Tip>
+
+<Warning>
+  **Event Payload**: When dispatching events, always include `from` (user ID) and `name` fields:
+  ```typescript
+  await bot.dispatch('MY_EVENT', {
+    from: '1234567890',
+    name: 'John Doe'
+  })
+  ```
+</Warning>
+
+<Note>
+  **Built-in Events**: Use `EVENTS` export for built-in events instead of creating custom ones:
+  ```typescript
+  import { EVENTS } from '@builderbot/bot'
+  addKeyword(EVENTS.WELCOME)
+  ```
+</Note>
+
+<Tip>
+  **Event vs Keyword**: Use events for programmatic triggers and keywords for user-initiated flows.
+</Tip>
+
+## Related Concepts
+
+- [Keywords](/concepts/keywords) - User-triggered flows
+- [Flows](/concepts/flows) - Understanding flow system
+- [Providers](/concepts/providers) - Provider event emitters
+- [State Management](/concepts/state-management) - Pass data to event flows

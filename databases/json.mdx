@@ -1,0 +1,286 @@
+---
+title: JSON File Database
+description: Simple file-based persistence for small to medium BuilderBot applications
+---
+
+The JSON File Database adapter provides lightweight persistence by storing conversation history in a JSON file. Perfect for small applications that need persistence without database infrastructure.
+
+## Installation
+
+```bash
+npm install @builderbot/database-json
+```
+
+## Basic Usage
+
+```typescript
+import { createBot, createFlow, createProvider } from '@builderbot/bot'
+import { JsonFileDB as Database } from '@builderbot/database-json'
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterDB = new Database({ filename: 'db.json' })
+  
+  await createBot({
+    flow: createFlow([]),
+    provider: createProvider(Provider),
+    database: adapterDB
+  })
+}
+
+main()
+```
+
+## Configuration
+
+<ParamField path="filename" type="string" required>
+  Name of the JSON file to store data. File is created in the current working directory.
+  
+  **Default**: `'db.json'`
+</ParamField>
+
+<ParamField path="debounceTime" type="number">
+  Delay in milliseconds to batch multiple writes together. Improves performance with high write volumes.
+  
+  **Default**: `0` (immediate writes)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```typescript Basic
+import { JsonFileDB } from '@builderbot/database-json'
+
+const adapterDB = new JsonFileDB({ filename: 'db.json' })
+```
+
+```typescript Custom Path
+import { JsonFileDB } from '@builderbot/database-json'
+
+const adapterDB = new JsonFileDB({ 
+  filename: 'data/conversations.json' 
+})
+```
+
+```typescript With Debouncing
+import { JsonFileDB } from '@builderbot/database-json'
+
+// Group writes for 500ms to reduce file I/O
+const adapterDB = new JsonFileDB({ 
+  filename: 'db.json',
+  debounceTime: 500
+})
+```
+</CodeGroup>
+
+## Features
+
+### Atomic Writes
+
+The adapter uses atomic write operations to prevent data corruption:
+
+```typescript packages/database-json/src/index.ts
+private async atomicWrite(): Promise<void> {
+  const parseData = JSON.stringify(this.listHistory, null, 2)
+  // Write to temporary file first
+  await fsPromises.writeFile(this.tempPath, parseData, 'utf-8')
+  // Then atomically rename (safe even if process crashes)
+  await fsPromises.rename(this.tempPath, this.pathFile)
+}
+```
+
+### Automatic Initialization
+
+The database file is created automatically if it doesn't exist:
+
+```typescript
+if (!existsSync(this.pathFile)) {
+  const parseData = JSON.stringify([], null, 2)
+  await fsPromises.writeFile(this.pathFile, parseData, 'utf-8')
+}
+```
+
+### Error Recovery
+
+Corrupted JSON files are handled gracefully:
+
+```typescript
+private validateJson(raw: string): HistoryEntry[] {
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return parsed
+    console.warn('Invalid data, starting fresh')
+    return []
+  } catch (e) {
+    console.warn('Corrupted file, starting fresh:', e.message)
+    return []
+  }
+}
+```
+
+## Data Schema
+
+The JSON file stores an array of history entries:
+
+```json
+[
+  {
+    "ref": "flow-welcome",
+    "keyword": "hello",
+    "answer": "Hi there!",
+    "refSerialize": "flow-welcome-step-1",
+    "from": "1234567890",
+    "options": {
+      "capture": true,
+      "delay": 1000
+    }
+  },
+  {
+    "ref": "flow-register",
+    "keyword": "register",
+    "answer": "John Doe",
+    "refSerialize": "flow-register-step-2",
+    "from": "1234567890",
+    "options": {}
+  }
+]
+```
+
+## Performance Optimization
+
+### Debouncing
+
+For high-traffic bots, use debouncing to batch writes:
+
+```typescript
+const adapterDB = new JsonFileDB({ 
+  filename: 'db.json',
+  debounceTime: 1000  // Write at most once per second
+})
+```
+
+This reduces file I/O operations while maintaining data consistency.
+
+### Write Queue
+
+Writes are automatically queued to prevent race conditions:
+
+```typescript packages/database-json/src/index.ts
+private writeQueue: Promise<void> = Promise.resolve()
+
+private async safeWrite(): Promise<void> {
+  this.writeQueue = this.writeQueue.then(async () => {
+    await this.atomicWrite()
+  })
+  return this.writeQueue
+}
+```
+
+## TypeScript Support
+
+Full TypeScript definitions included:
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+import { JsonFileDB } from '@builderbot/database-json'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const welcomeFlow = addKeyword<BaileysProvider, JsonFileDB>(['hello'])
+  .addAnswer('Hi! How can I help you?')
+```
+
+## File Location
+
+The JSON file is created relative to `process.cwd()` (current working directory):
+
+```typescript
+const pathFile = join(process.cwd(), this.options.filename)
+```
+
+Make sure your application has write permissions in the working directory.
+
+## Backup and Recovery
+
+Since data is stored in a single JSON file, backups are simple:
+
+```bash
+# Backup
+cp db.json db.backup.json
+
+# Restore
+cp db.backup.json db.json
+```
+
+<Tip>
+  Consider adding `db.json` to your `.gitignore` to avoid committing user data.
+</Tip>
+
+## Limitations
+
+<Warning>
+  **Not suitable for**:
+  - High-concurrency applications (>1000 msgs/min)
+  - Multi-server deployments
+  - Large datasets (>10MB)
+  - Distributed systems
+</Warning>
+
+## When to Use JSON Database
+
+### Good Use Cases
+
+- Small to medium bots (up to a few thousand users)
+- Single-server deployments
+- Development and staging environments
+- Projects without database infrastructure
+- Simple backup requirements
+
+### When to Upgrade
+
+Consider upgrading to MongoDB, MySQL, or PostgreSQL when:
+- You need to scale across multiple servers
+- File size exceeds 10MB
+- You need complex queries or relationships
+- Write frequency exceeds 100/second
+
+## Migration Example
+
+Migrating from JSON to a database:
+
+```typescript
+import { JsonFileDB } from '@builderbot/database-json'
+import { MongoAdapter } from '@builderbot/database-mongo'
+import { readFileSync } from 'fs'
+
+const migrateToMongo = async () => {
+  // Read JSON file
+  const data = JSON.parse(readFileSync('db.json', 'utf-8'))
+  
+  // Connect to MongoDB
+  const mongo = new MongoAdapter({
+    dbUri: process.env.MONGO_DB_URI,
+    dbName: process.env.MONGO_DB_NAME
+  })
+  
+  // Wait for connection
+  await new Promise(resolve => setTimeout(resolve, 2000))
+  
+  // Insert all records
+  for (const entry of data) {
+    await mongo.save(entry)
+  }
+  
+  console.log(`Migrated ${data.length} entries`)
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MongoDB" icon="leaf" href="/databases/mongodb">
+    Upgrade to a scalable NoSQL database
+  </Card>
+  <Card title="PostgreSQL" icon="database" href="/databases/postgresql">
+    Use a relational database with advanced features
+  </Card>
+</CardGroup>

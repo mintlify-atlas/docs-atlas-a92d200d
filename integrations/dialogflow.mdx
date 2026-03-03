@@ -1,0 +1,370 @@
+---
+title: 'Dialogflow Integration'
+description: 'Integrate Google Dialogflow ES with BuilderBot for natural language understanding'
+icon: 'google'
+---
+
+# Dialogflow Integration
+
+Integrate Google Dialogflow ES (Essentials) with BuilderBot to add natural language understanding to your chatbot conversations.
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    Install the Dialogflow context package:
+
+    <CodeGroup>
+    ```bash npm
+    npm install @builderbot/contexts-dialogflow
+    ```
+
+    ```bash pnpm
+    pnpm add @builderbot/contexts-dialogflow
+    ```
+
+    ```bash yarn
+    yarn add @builderbot/contexts-dialogflow
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install Google Cloud dependencies">
+    The package requires Google Cloud Dialogflow SDK:
+
+    ```bash
+    npm install @google-cloud/dialogflow
+    ```
+
+    <Note>
+      This dependency is included automatically when you install `@builderbot/contexts-dialogflow`
+    </Note>
+  </Step>
+
+  <Step title="Get Google Cloud credentials">
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create or select a project
+    3. Enable the Dialogflow API
+    4. Create a service account
+    5. Download the JSON key file
+    6. Save it as `google-key.json` in your project root
+  </Step>
+</Steps>
+
+## Configuration
+
+### Setup Google Credentials
+
+Place your `google-key.json` file in your project root directory:
+
+```json google-key.json
+{
+  "type": "service_account",
+  "project_id": "your-project-id",
+  "private_key_id": "key-id",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "client_email": "your-service-account@your-project.iam.gserviceaccount.com",
+  "client_id": "123456789",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/..."
+}
+```
+
+<Warning>
+  Never commit `google-key.json` to version control. Add it to your `.gitignore` file.
+</Warning>
+
+### Initialize Dialogflow Context
+
+Create an instance of DialogFlowContext in your bot:
+
+<CodeGroup>
+```javascript app.js
+const { createBot, createProvider, createFlow } = require('@builderbot/bot')
+const { DialogFlowContext } = require('@builderbot/contexts-dialogflow')
+const { MemoryDB } = require('@builderbot/bot')
+const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+const main = async () => {
+  const adapterFlow = createFlow([])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  // Initialize Dialogflow
+  const dialogflow = new DialogFlowContext(
+    adapterDB,
+    adapterProvider,
+    {
+      language: 'es' // Set your language code
+    }
+  )
+
+  const bot = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+
+```typescript app.ts
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { DialogFlowContext } from '@builderbot/contexts-dialogflow'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterFlow = createFlow([])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  // Initialize Dialogflow
+  const dialogflow = new DialogFlowContext(
+    adapterDB,
+    adapterProvider,
+    {
+      language: 'es' // Set your language code
+    }
+  )
+
+  const bot = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+</CodeGroup>
+
+## Configuration Options
+
+<ParamField path="language" type="string" default="es">
+  Language code for Dialogflow agent (e.g., 'en', 'es', 'fr', 'pt')
+</ParamField>
+
+## Usage
+
+### Handle Messages with Dialogflow
+
+Process incoming messages through Dialogflow:
+
+```javascript
+const welcomeFlow = addKeyword(['hello', 'hi'])
+  .addAction(async (ctx, { flowDynamic }) => {
+    // Send message to Dialogflow
+    await dialogflow.handleMsg({
+      from: ctx.from,
+      body: ctx.body
+    })
+  })
+```
+
+### Complete Example with Flows
+
+<CodeGroup>
+```javascript complete-example.js
+const { createBot, createProvider, createFlow, addKeyword } = require('@builderbot/bot')
+const { DialogFlowContext } = require('@builderbot/contexts-dialogflow')
+const { MemoryDB } = require('@builderbot/bot')
+const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+const main = async () => {
+  const adapterDB = new MemoryDB()
+  const adapterProvider = createProvider(BaileysProvider)
+
+  // Initialize Dialogflow
+  const dialogflow = new DialogFlowContext(
+    adapterDB,
+    adapterProvider,
+    { language: 'es' }
+  )
+
+  // Create flow that uses Dialogflow
+  const aiFlow = addKeyword(['.*'], { regex: true })
+    .addAction(async (ctx) => {
+      await dialogflow.handleMsg({
+        from: ctx.from,
+        body: ctx.body
+      })
+    })
+
+  const adapterFlow = createFlow([aiFlow])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+
+```typescript complete-example.ts
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { DialogFlowContext } from '@builderbot/contexts-dialogflow'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const main = async () => {
+  const adapterDB = new MemoryDB()
+  const adapterProvider = createProvider(BaileysProvider)
+
+  // Initialize Dialogflow
+  const dialogflow = new DialogFlowContext(
+    adapterDB,
+    adapterProvider,
+    { language: 'es' }
+  )
+
+  // Create flow that uses Dialogflow
+  const aiFlow = addKeyword(['.*'], { regex: true })
+    .addAction(async (ctx) => {
+      await dialogflow.handleMsg({
+        from: ctx.from,
+        body: ctx.body
+      })
+    })
+
+  const adapterFlow = createFlow([aiFlow])
+
+  await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+}
+
+main()
+```
+</CodeGroup>
+
+## Response Types
+
+Dialogflow can send different types of responses:
+
+### Text Responses
+
+Simple text messages from Dialogflow intents:
+
+```javascript
+// Dialogflow returns text response
+// BuilderBot automatically sends: "Hello! How can I help you?"
+```
+
+### Rich Media (Payload)
+
+Send images, buttons, and interactive content using custom payloads in Dialogflow:
+
+```json Dialogflow Custom Payload
+{
+  "answer": "Here's our product catalog",
+  "media": "https://example.com/image.jpg",
+  "buttons": [
+    { "body": "View Products" },
+    { "body": "Contact Sales" },
+    { "body": "Support" }
+  ]
+}
+```
+
+The context automatically handles these rich responses and sends them through BuilderBot.
+
+## Session Management
+
+Dialogflow Context automatically manages user sessions:
+
+- Each user (identified by `from` number) gets their own session
+- Sessions maintain conversation context
+- Dialogflow tracks intents and entities per session
+
+## Environment Variables (Optional)
+
+Alternatively, you can use environment variables for credentials:
+
+```bash .env
+GOOGLE_KEY_JSON={"type":"service_account","project_id":"..."}
+```
+
+```javascript
+process.env.GOOGLE_KEY_JSON = JSON.stringify(credentials)
+```
+
+## TypeScript Support
+
+Full TypeScript definitions are included:
+
+```typescript
+import type { 
+  DialogFlowContextOptions,
+  MessageContextIncoming,
+  Credential 
+} from '@builderbot/contexts-dialogflow'
+
+const options: DialogFlowContextOptions = {
+  language: 'en'
+}
+
+const message: MessageContextIncoming = {
+  from: '1234567890',
+  body: 'Hello'
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Secure Your Credentials">
+    - Never commit `google-key.json` to version control
+    - Use environment variables in production
+    - Restrict service account permissions to only Dialogflow API
+  </Accordion>
+
+  <Accordion title="Language Configuration">
+    - Set the correct language code for your Dialogflow agent
+    - Ensure Dialogflow agent supports the configured language
+    - Use language codes like: 'en', 'es', 'pt', 'fr', 'de'
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    - Wrap `handleMsg` calls in try-catch blocks
+    - Handle missing credentials gracefully
+    - Monitor Dialogflow API quotas and usage
+  </Accordion>
+
+  <Accordion title="Testing">
+    - Test with various intents in Dialogflow console first
+    - Verify custom payloads work correctly
+    - Test session context across multiple messages
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Error: "No se encontró google-key.json"
+
+Ensure your `google-key.json` file is in the project root directory.
+
+### Dialogflow not responding
+
+1. Verify your service account has Dialogflow API access
+2. Check that the project ID matches your Dialogflow agent
+3. Ensure the Dialogflow API is enabled in Google Cloud Console
+
+### Session issues
+
+Sessions are created per user (`from` field). If experiencing session problems:
+- Verify the `from` field is consistent for each user
+- Check Dialogflow session timeout settings
+
+## Related Resources
+
+- [Dialogflow ES Documentation](https://cloud.google.com/dialogflow/es/docs)
+- [Google Cloud Console](https://console.cloud.google.com/)
+- [Dialogflow CX Integration](/integrations/dialogflow-cx)

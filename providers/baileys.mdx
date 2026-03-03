@@ -1,0 +1,436 @@
+---
+title: Baileys Provider
+description: WhatsApp integration using the Baileys library
+---
+
+The Baileys provider enables WhatsApp integration using the open-source Baileys library. It's perfect for development, testing, and small to medium-scale WhatsApp bots.
+
+## Features
+
+- QR code authentication
+- Pairing code authentication
+- Send text, images, videos, audio, and documents
+- Receive media and files
+- Send polls
+- Send locations and contacts
+- Sticker support
+- Group message support (optional)
+- Read status support (optional)
+- Session persistence
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-baileys
+```
+
+## Dependencies
+
+The Baileys provider uses:
+- `baileys`: ^7.0.0-rc.9 - Core WhatsApp Web API
+- `sharp`: Image processing
+- `ffmpeg`: Audio/video processing
+- `wa-sticker-formatter`: Sticker creation
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(BaileysProvider, {
+  name: 'my-bot',
+  port: 3000
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Configuration Options
+
+```typescript
+const provider = createProvider(BaileysProvider, {
+  // Required
+  name: 'bot', // Session name
+  
+  // Optional
+  port: 3000, // HTTP server port
+  usePairingCode: false, // Use pairing code instead of QR
+  phoneNumber: '+1234567890', // Required if usePairingCode is true
+  browser: ['Windows', 'Chrome', 'Chrome 114.0.5735.198'],
+  gifPlayback: false, // Send videos as GIF
+  groupsIgnore: true, // Ignore group messages
+  readStatus: false, // Don't read status updates
+  writeMyself: 'none', // Options: 'none', 'both', 'host'
+  timeRelease: 0, // Auto-cleanup session files (ms)
+  version: [2, 3000, 1027934701] // WhatsApp version
+})
+```
+
+## Authentication
+
+### QR Code Authentication
+
+By default, the provider uses QR code authentication:
+
+```typescript
+const provider = createProvider(BaileysProvider, {
+  name: 'bot',
+  usePairingCode: false // Default
+})
+```
+
+Scan the QR code at `http://localhost:3000/` or check the console output.
+
+### Pairing Code Authentication
+
+```typescript
+const provider = createProvider(BaileysProvider, {
+  name: 'bot',
+  usePairingCode: true,
+  phoneNumber: '+1234567890' // Your WhatsApp number
+})
+```
+
+The pairing code will be displayed in the console and emitted via the `require_action` event.
+
+## Basic Usage
+
+### Sending Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to our bot')
+  .addAnswer('How can I help you today?')
+```
+
+### Sending Media
+
+```typescript
+const mediaFlow = addKeyword('media')
+  // Send image from local file
+  .addAnswer('Here is an image:', {
+    media: './assets/image.png'
+  })
+  // Send image from URL
+  .addAnswer('Image from URL:', {
+    media: 'https://example.com/image.jpg'
+  })
+  // Send video
+  .addAnswer('Check this video:', {
+    media: './assets/video.mp4'
+  })
+  // Send audio
+  .addAnswer('Listen to this:', {
+    media: './assets/audio.mp3'
+  })
+  // Send document
+  .addAnswer('Here is a PDF:', {
+    media: './assets/document.pdf'
+  })
+```
+
+### Receiving Media
+
+```typescript
+import { join } from 'path'
+
+const receiveMediaFlow = addKeyword('MEDIA')
+  .addAnswer('Send me an image!', { capture: true }, async (ctx, { provider, flowDynamic }) => {
+    // Save the received file
+    const filePath = await provider.saveFile(ctx, {
+      path: join(process.cwd(), 'downloads')
+    })
+    
+    await flowDynamic(`File saved at: ${filePath}`)
+  })
+```
+
+## Advanced Features
+
+### Sending Polls
+
+```typescript
+const pollFlow = addKeyword('poll')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendPoll(
+      ctx.from,
+      'Do you like BuilderBot?',
+      {
+        options: ['Yes', 'No', 'Maybe'],
+        multiselect: false
+      }
+    )
+  })
+```
+
+### Sending Location
+
+```typescript
+const locationFlow = addKeyword('location')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendLocation(
+      ctx.from,
+      '40.7128',  // latitude
+      '-74.0060', // longitude
+      ctx // optional: reply to message
+    )
+  })
+```
+
+### Sending Contact
+
+```typescript
+const contactFlow = addKeyword('contact')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendContact(
+      ctx.from,
+      '+1234567890',
+      'John Doe',
+      'Company Name'
+    )
+  })
+```
+
+### Sending Stickers
+
+```typescript
+const stickerFlow = addKeyword('sticker')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendSticker(
+      ctx.from,
+      './assets/image.png',
+      {
+        pack: 'My Sticker Pack',
+        author: 'BuilderBot'
+      }
+    )
+  })
+```
+
+### Presence Updates (Typing Indicator)
+
+```typescript
+const typingFlow = addKeyword('typing')
+  .addAction(async (ctx, { provider }) => {
+    // Show typing indicator
+    await provider.sendPresenceUpdate(ctx.from, 'composing')
+    
+    // Simulate work
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    // Stop typing
+    await provider.sendPresenceUpdate(ctx.from, 'paused')
+  })
+```
+
+## Event Handling
+
+### Ready Event
+
+```typescript
+provider.on('ready', () => {
+  console.log('Bot is ready!')
+})
+```
+
+### Host Information
+
+```typescript
+provider.on('host', (host) => {
+  console.log('Connected as:', host.phone)
+})
+```
+
+### Authentication Failure
+
+```typescript
+provider.on('auth_failure', (error) => {
+  console.error('Authentication failed:', error)
+})
+```
+
+### Require Action (QR/Pairing Code)
+
+```typescript
+provider.on('require_action', ({ title, instructions, payload }) => {
+  console.log(title)
+  console.log(instructions)
+  if (payload.qr) {
+    console.log('QR Code available at http://localhost:3000')
+  }
+  if (payload.code) {
+    console.log('Pairing code:', payload.code)
+  }
+})
+```
+
+## Session Management
+
+### Session Files
+
+Sessions are stored in `{name}_sessions/` directory by default.
+
+### Clear Session
+
+```typescript
+// Manually release session files
+await provider.releaseSessionFiles()
+```
+
+### Auto-cleanup
+
+```typescript
+const provider = createProvider(BaileysProvider, {
+  name: 'bot',
+  timeRelease: 21600000 // 6 hours in milliseconds
+})
+```
+
+## HTTP Endpoints
+
+The provider exposes an HTTP server for QR code access and custom endpoints.
+
+### QR Code Endpoint
+
+```
+GET http://localhost:3000/
+```
+
+Displays the QR code image.
+
+### Custom Endpoints
+
+```typescript
+provider.server.post('/v1/messages', handleCtx(async (bot, req, res) => {
+  const { number, message, urlMedia } = req.body
+  await bot.sendMessage(number, message, { media: urlMedia ?? null })
+  return res.end('sent')
+}))
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Session Management">
+    - Keep session files backed up
+    - Don't share session files (they contain authentication data)
+    - Use `timeRelease` for automatic cleanup in production
+    - Monitor session health with the `ready` event
+  </Accordion>
+
+  <Accordion title="Message Rate Limiting">
+    - Avoid sending too many messages too quickly
+    - Use delays between messages
+    - Baileys has built-in rate limiting to prevent bans
+  </Accordion>
+
+  <Accordion title="Group Messages">
+    - Set `groupsIgnore: true` to ignore group messages by default
+    - Handle group messages separately if needed
+    - Be careful with automated replies in groups
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    - Listen to `auth_failure` events
+    - Implement reconnection logic
+    - Log errors to `baileys.log` (automatically created)
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="QR Code Not Loading">
+    Check the logs in `baileys.log` file. Ensure the port is not in use and your firewall allows connections.
+  </Accordion>
+
+  <Accordion title="Session Expired">
+    Delete the `{name}_sessions` directory and restart. You'll need to scan the QR code again.
+  </Accordion>
+
+  <Accordion title="Messages Not Sending">
+    - Check if the phone number is correctly formatted
+    - Verify the session is active (check `ready` event)
+    - Review rate limiting
+  </Accordion>
+
+  <Accordion title="Connection Keeps Dropping">
+    - Check your internet connection
+    - Verify WhatsApp is working on your phone
+    - Review `baileys.log` for detailed error messages
+    - The provider has automatic reconnection with exponential backoff
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Bot
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+import { MemoryDB } from '@builderbot/bot'
+import { join } from 'path'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('🙌 Hello! Welcome to our chatbot')
+  .addAnswer('How can I help you?', { capture: true }, async (ctx, { fallBack }) => {
+    if (!ctx.body.toLowerCase().includes('help')) {
+      return fallBack('Please type "help" to continue')
+    }
+  })
+
+const samplesFlow = addKeyword('samples')
+  .addAnswer('I\'ll send you some files...')
+  .addAnswer('Image:', { media: join(process.cwd(), 'assets', 'sample.png') })
+  .addAnswer('Video:', { media: 'https://example.com/video.mp4' })
+  .addAnswer('Audio:', { media: 'https://example.com/audio.mp3' })
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow, samplesFlow])
+  
+  const adapterProvider = createProvider(BaileysProvider, {
+    name: 'my-bot',
+    usePairingCode: false,
+    version: [2, 3000, 1027934701]
+  })
+  
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(3000)
+}
+
+main()
+```
+
+## Migration from Other Providers
+
+Switching from other WhatsApp providers to Baileys:
+
+1. Install the Baileys provider
+2. Update the import statement
+3. Adjust configuration (remove API keys, add session name)
+4. Test authentication flow
+5. Verify media handling works as expected
+
+## Further Resources
+
+- [Baileys GitHub](https://github.com/WhiskeySockets/Baileys)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)
+- [Official Documentation](https://builderbot.app)

@@ -1,0 +1,477 @@
+---
+title: Venom Provider
+description: WhatsApp integration via Venom library
+---
+
+The Venom provider enables WhatsApp integration using the Venom library, a powerful browser-based automation tool for WhatsApp Web.
+
+## Features
+
+- QR code authentication
+- Text messaging
+- Media support (images, videos, audio, documents)
+- Voice notes (PTT)
+- Stickers
+- Location messages
+- Contact cards
+- Call detection
+- Session persistence
+- Browser automation
+
+## Installation
+
+```bash
+npm install @builderbot/bot @builderbot/provider-venom
+```
+
+## Dependencies
+
+The provider uses:
+- `venom-bot`: Browser automation for WhatsApp Web
+
+## Configuration
+
+### Basic Setup
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { VenomProvider } from '@builderbot/provider-venom'
+import { MemoryDB } from '@builderbot/bot'
+
+const provider = createProvider(VenomProvider, {
+  name: 'my-bot',
+  gifPlayback: false
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: new MemoryDB(),
+})
+
+httpServer(3000)
+```
+
+### Configuration Options
+
+```typescript
+const provider = createProvider(VenomProvider, {
+  name: 'my-bot',      // Session name
+  gifPlayback: false,  // Send videos as GIF
+  port: 3000,          // HTTP server port
+  headless: 'new',     // Browser headless mode
+  autoClose: 45000,    // Auto-close browser timeout (ms)
+  folderNameToken: undefined // Custom session folder
+})
+```
+
+## Authentication
+
+### QR Code
+
+On first run:
+
+1. Start your bot
+2. QR code appears in terminal and at `http://localhost:3000/`
+3. Open WhatsApp on your phone
+4. Go to Settings > Linked Devices > Link a Device
+5. Scan the QR code
+6. Wait for "Connected" message
+
+### Session Persistence
+
+Venom automatically saves sessions in:
+```
+{name}_sessions/
+```
+
+## Basic Usage
+
+### Sending Text Messages
+
+```typescript
+import { addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Hello! Welcome to our service')
+  .addAnswer('How can I assist you?')
+```
+
+### Sending Media
+
+```typescript
+import { join } from 'path'
+
+const mediaFlow = addKeyword('media')
+  // Send image
+  .addAnswer('Here is an image:', {
+    media: join(process.cwd(), 'assets', 'image.jpg')
+  })
+  // Send video
+  .addAnswer('Check this video:', {
+    media: './assets/video.mp4'
+  })
+  // Send audio
+  .addAnswer('Listen to this:', {
+    media: './assets/audio.mp3'
+  })
+  // Send document
+  .addAnswer('Here is a PDF:', {
+    media: './assets/document.pdf'
+  })
+```
+
+## Advanced Features
+
+### Sending Images
+
+```typescript
+const imageFlow = addKeyword('image')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendImage(
+      ctx.from,
+      './path/to/image.jpg',
+      'Check out this image!'
+    )
+  })
+```
+
+### Sending Videos
+
+```typescript
+const videoFlow = addKeyword('video')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendVideo(
+      ctx.from,
+      './path/to/video.mp4',
+      'Watch this'
+    )
+  })
+```
+
+<Note>
+  Videos are sent as GIFs by default using `sendVideoAsGif`.
+</Note>
+
+### Sending Voice Notes
+
+```typescript
+const voiceFlow = addKeyword('voice')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendAudio(
+      ctx.from,
+      './path/to/audio.ogg'
+    )
+  })
+```
+
+<Note>
+  Audio files are automatically converted to MP3 format for voice notes.
+</Note>
+
+### Sending Documents
+
+```typescript
+const documentFlow = addKeyword('document')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendFile(
+      ctx.from,
+      './path/to/document.pdf',
+      'Here is the requested file'
+    )
+  })
+```
+
+### Buttons (Deprecated)
+
+```typescript
+// Note: Buttons are deprecated in WhatsApp
+// This will send text with button labels
+const buttonFlow = addKeyword('options')
+  .addAnswer(
+    'Choose an option:',
+    {
+      buttons: [
+        { body: 'Option 1' },
+        { body: 'Option 2' }
+      ]
+    }
+  )
+// Sends: "Choose an option:\nOption 1\nOption 2"
+```
+
+### Saving Received Files
+
+```typescript
+import { join } from 'path'
+
+const receiveMediaFlow = addKeyword('MEDIA')
+  .addAction(async (ctx, { provider, flowDynamic }) => {
+    const filePath = await provider.saveFile(ctx, {
+      path: join(process.cwd(), 'downloads')
+    })
+    
+    await flowDynamic(`File saved: ${filePath}`)
+  })
+```
+
+## Media Type Detection
+
+Venom automatically detects media types:
+
+```typescript
+const autoMediaFlow = addKeyword('send')
+  .addAnswer('Sending file...', {
+    media: './file.jpg'  // Auto-detected as image
+  })
+```
+
+Detection logic:
+- **Images** (image/*): `sendImage`
+- **Videos** (video/*): `sendVideoAsGif`
+- **Audio** (audio/*): Converted to MP3, then `sendAudio`
+- **Other**: `sendFile`
+
+## Event Handling
+
+### Message Events
+
+```typescript
+provider.on('message', (payload) => {
+  if (payload.type === 'image' || payload.type === 'video') {
+    console.log('Received media')
+  } else if (payload.type === 'ptt') {
+    console.log('Received voice note')
+  } else if (payload.type === 'document') {
+    console.log('Received document')
+  }
+})
+```
+
+### Ready Event
+
+```typescript
+provider.on('ready', () => {
+  console.log('Venom is ready!')
+})
+```
+
+### Host Information
+
+```typescript
+provider.on('host', (host) => {
+  console.log('Connected as:', host.name)
+  console.log('Phone:', host.phone)
+})
+```
+
+### QR Code Required
+
+```typescript
+provider.on('require_action', ({ title, instructions, payload }) => {
+  console.log(title)
+  console.log(instructions.join('\n'))
+  // QR available at http://localhost:3000/
+})
+```
+
+### Call Detection
+
+Venom can detect incoming calls:
+
+```typescript
+// This is handled internally by the provider
+// Calls are logged but not auto-rejected
+```
+
+## Session Management
+
+### Session Files
+
+Sessions are stored in:
+```
+{name}_sessions/
+```
+
+### Clear Session
+
+To reset and re-authenticate:
+
+```bash
+rm -rf {name}_sessions
+```
+
+Restart your bot and scan QR code again.
+
+### Session Recovery
+
+If connection fails, Venom automatically:
+1. Clears corrupted session
+2. Waits 5 seconds
+3. Restarts authentication
+
+## Browser Configuration
+
+### Headless Mode
+
+```typescript
+const provider = createProvider(VenomProvider, {
+  name: 'bot',
+  headless: 'new'  // 'new', true, false
+})
+```
+
+### Custom Browser Args
+
+Venom uses Puppeteer under the hood. You can pass additional options:
+
+```typescript
+const provider = createProvider(VenomProvider, {
+  name: 'bot',
+  // Venom will pass these to Puppeteer
+  browserArgs: ['--no-sandbox', '--disable-setuid-sandbox']
+})
+```
+
+## HTTP Endpoints
+
+### QR Code Endpoint
+
+```
+GET http://localhost:3000/
+```
+
+Displays the QR code image.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Session Management">
+    - Backup session files regularly
+    - Monitor for session expiration
+    - Implement graceful reconnection
+    - Don't share session files
+  </Accordion>
+
+  <Accordion title="Media Handling">
+    - Convert audio to MP3 for compatibility
+    - Validate file formats before sending
+    - Clean up downloaded files periodically
+    - Monitor disk space usage
+  </Accordion>
+
+  <Accordion title="Browser Performance">
+    - Use headless mode in production
+    - Monitor memory usage
+    - Restart browser periodically for long-running bots
+    - Close unused browser instances
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    - Implement retry logic for failed sends
+    - Log errors for debugging
+    - Handle browser crashes gracefully
+    - Monitor Venom logs
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="QR Code Not Showing">
+    - Check if port 3000 is available
+    - Verify browser can be launched
+    - Review console logs
+    - Try non-headless mode for debugging
+  </Accordion>
+
+  <Accordion title="Session Expired">
+    - Delete `{name}_sessions` directory
+    - Restart the bot
+    - Scan QR code again
+    - Check WhatsApp session limits
+  </Accordion>
+
+  <Accordion title="Browser Crashes">
+    - Increase system memory
+    - Update Chrome/Chromium
+    - Check for resource leaks
+    - Use `--no-sandbox` flag if needed
+  </Accordion>
+
+  <Accordion title="Messages Not Sending">
+    - Verify session is connected
+    - Check phone number format
+    - Ensure WhatsApp Web is accessible
+    - Review browser console logs
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Bot
+
+```typescript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { VenomProvider } from '@builderbot/provider-venom'
+import { MemoryDB } from '@builderbot/bot'
+import { join } from 'path'
+
+const welcomeFlow = addKeyword(['hi', 'hello', 'start'])
+  .addAnswer('👋 Welcome to our WhatsApp service!')
+  .addAnswer('How can we help you today?')
+
+const mediaFlow = addKeyword('files')
+  .addAnswer('Sending media files...')
+  .addAnswer('Image:', {
+    media: join(process.cwd(), 'assets', 'image.png')
+  })
+  .addAnswer('Document:', {
+    media: join(process.cwd(), 'assets', 'document.pdf')
+  })
+
+const voiceFlow = addKeyword('voice')
+  .addAction(async (ctx, { provider }) => {
+    await provider.sendAudio(
+      ctx.from,
+      './assets/audio.mp3'
+    )
+  })
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow, mediaFlow, voiceFlow])
+  
+  const adapterProvider = createProvider(VenomProvider, {
+    name: 'my-venom-bot',
+    gifPlayback: false,
+    headless: 'new'
+  })
+  
+  const adapterDB = new MemoryDB()
+
+  const { handleCtx, httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(3000)
+}
+
+main()
+```
+
+## Comparison with Other Providers
+
+| Feature | Venom | WPPConnect | Baileys |
+|---------|-------|------------|--------|
+| Setup | Easy | Easy | Easy |
+| Cost | Free | Free | Free |
+| Browser-based | ✅ | ✅ | ❌ |
+| Memory Usage | High | High | Low |
+| Stability | Good | Good | Excellent |
+| Call Detection | ✅ | ❌ | ✅ |
+
+## Further Resources
+
+- [Venom GitHub](https://github.com/orkestral/venom)
+- [Venom Documentation](https://orkestral.gitbook.io/venom)
+- [BuilderBot Discord](https://link.codigoencasa.com/DISCORD)

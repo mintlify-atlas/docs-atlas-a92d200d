@@ -1,0 +1,198 @@
+---
+title: 'createProvider'
+description: 'Create a messaging provider instance for your bot'
+---
+
+## Overview
+
+The `createProvider` function creates an instance of a messaging platform provider (WhatsApp, Telegram, etc.) that handles the communication layer for your bot.
+
+## Function Signature
+
+<CodeGroup>
+```typescript TypeScript
+const createProvider = <T = ProviderClass, K = typeof ProviderClass.prototype.globalVendorArgs>(
+  providerClass: new (args: K) => T,
+  args: K = null
+): T
+```
+
+```javascript JavaScript
+const createProvider = (providerClass, args = null)
+```
+</CodeGroup>
+
+## Parameters
+
+<ParamField path="providerClass" type="ProviderClass" required>
+  The provider class to instantiate. Import from provider-specific packages like `@builderbot/provider-baileys`, `@builderbot/provider-twilio`, etc.
+</ParamField>
+
+<ParamField path="args" type="object">
+  Provider-specific configuration arguments. Each provider has its own configuration options.
+  
+  <Expandable title="Common properties">
+    <ParamField path="name" type="string">
+      Custom name for the bot instance.
+    </ParamField>
+    
+    <ParamField path="port" type="number">
+      Port number for the provider's webhook or API server (if applicable).
+    </ParamField>
+    
+    <ParamField path="writeMyself" type="'none' | 'host' | 'both'">
+      Controls whether the bot responds to its own messages.
+      - `none`: Don't write to itself
+      - `host`: Only write to host
+      - `both`: Write to both
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="provider" type="T">
+  Returns an instance of the specified provider class, configured and ready to use.
+</ResponseField>
+
+## Usage Examples
+
+### Baileys Provider (WhatsApp)
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createProvider } from '@builderbot/bot'
+    import { BaileysProvider } from '@builderbot/provider-baileys'
+
+    const adapterProvider = createProvider(BaileysProvider)
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createProvider } = require('@builderbot/bot')
+    const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+    const adapterProvider = createProvider(BaileysProvider)
+    ```
+  </Tab>
+</Tabs>
+
+### With Custom Configuration
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createProvider } from '@builderbot/bot'
+    import { BaileysProvider } from '@builderbot/provider-baileys'
+
+    const adapterProvider = createProvider(BaileysProvider, {
+      name: 'my-whatsapp-bot',
+      writeMyself: 'none'
+    })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createProvider } = require('@builderbot/bot')
+    const { BaileysProvider } = require('@builderbot/provider-baileys')
+
+    const adapterProvider = createProvider(BaileysProvider, {
+      name: 'my-whatsapp-bot',
+      writeMyself: 'none'
+    })
+    ```
+  </Tab>
+</Tabs>
+
+### Twilio Provider
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createProvider } from '@builderbot/bot'
+    import { TwilioProvider } from '@builderbot/provider-twilio'
+
+    const adapterProvider = createProvider(TwilioProvider, {
+      accountSid: process.env.TWILIO_ACCOUNT_SID,
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      vendorNumber: process.env.TWILIO_PHONE_NUMBER,
+      port: 3000
+    })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createProvider } = require('@builderbot/bot')
+    const { TwilioProvider } = require('@builderbot/provider-twilio')
+
+    const adapterProvider = createProvider(TwilioProvider, {
+      accountSid: process.env.TWILIO_ACCOUNT_SID,
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      vendorNumber: process.env.TWILIO_PHONE_NUMBER,
+      port: 3000
+    })
+    ```
+  </Tab>
+</Tabs>
+
+### Meta Provider (WhatsApp Business API)
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createProvider } from '@builderbot/bot'
+    import { MetaProvider } from '@builderbot/provider-meta'
+
+    const adapterProvider = createProvider(MetaProvider, {
+      jwtToken: process.env.META_JWT_TOKEN,
+      numberId: process.env.META_NUMBER_ID,
+      verifyToken: process.env.META_VERIFY_TOKEN,
+      version: 'v21.0',
+      port: 3000
+    })
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const { createProvider } = require('@builderbot/bot')
+    const { MetaProvider } = require('@builderbot/provider-meta')
+
+    const adapterProvider = createProvider(MetaProvider, {
+      jwtToken: process.env.META_JWT_TOKEN,
+      numberId: process.env.META_NUMBER_ID,
+      verifyToken: process.env.META_VERIFY_TOKEN,
+      version: 'v21.0',
+      port: 3000
+    })
+    ```
+  </Tab>
+</Tabs>
+
+## Available Providers
+
+BuildBot supports multiple messaging platforms:
+
+- **BaileysProvider** - WhatsApp (via Baileys library)
+- **TwilioProvider** - WhatsApp, SMS (via Twilio)
+- **MetaProvider** - WhatsApp Business API
+- **TelegramProvider** - Telegram
+- **DiscordProvider** - Discord
+
+Each provider has its own specific configuration options. Refer to the provider-specific documentation for detailed configuration.
+
+## Notes
+
+- The provider handles all platform-specific communication details
+- Provider configuration varies by platform - check provider-specific docs
+- Some providers require webhooks and external connectivity
+- The `args` parameter can be `null` for providers with default configurations
+
+## Related
+
+- [createBot](/api/create-bot) - Initialize the bot with a provider
+- [createFlow](/api/create-flow) - Create conversation flows

@@ -1,0 +1,240 @@
+---
+title: Flow System
+description: Understanding flows and the FlowClass in BuilderBot
+---
+
+## What is a Flow?
+
+In BuilderBot, a **flow** represents a conversation path or dialogue structure. The `FlowClass` manages the flow system, handling flow manipulation, creating callback indices, and enabling keyword-based navigation through conversations.
+
+## Creating Flows
+
+Flows are created using the `createFlow` function, which accepts an array of flow definitions:
+
+```typescript
+import { createFlow, addKeyword } from '@builderbot/bot'
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+  .addAnswer('Welcome to our chatbot!')
+
+const helpFlow = addKeyword('help')
+  .addAnswer('How can I help you?')
+
+const adapterFlow = createFlow([welcomeFlow, helpFlow])
+```
+
+## FlowClass Architecture
+
+The `FlowClass` is the core engine that manages all flows in your bot. It provides several key capabilities:
+
+### Internal Structure
+
+```typescript
+class FlowClass {
+  allCallbacks: Record<string, Function>
+  flowSerialize: TContext[]
+  flowRaw: TFlow[]
+}
+```
+
+**Key properties:**
+
+- `allCallbacks` - Index of all callback functions across flows
+- `flowSerialize` - Serialized representation of flows for efficient matching
+- `flowRaw` - Original flow definitions
+
+### Flow Matching
+
+The `find()` method is the heart of flow matching, supporting multiple matching strategies:
+
+```typescript
+find(keyOrWord: string, symbol: boolean = false, overFlow: TContext[] | null = null): TContext[]
+```
+
+<Steps>
+  <Step title="Keyword Matching">
+    When a user message arrives, the flow system searches for matching keywords using case-insensitive or case-sensitive matching.
+  </Step>
+  
+  <Step title="Symbol Resolution">
+    If `symbol` is true, it performs direct reference lookup by flow ID rather than text matching.
+  </Step>
+  
+  <Step title="Nested Flow Discovery">
+    The system recursively follows flow references to build the complete conversation path.
+  </Step>
+</Steps>
+
+### Matching Options
+
+The flow system supports sophisticated matching through options:
+
+**Case Sensitivity:**
+```typescript
+const flow = addKeyword('HELLO', { sensitive: true })
+// Only matches "HELLO" exactly
+```
+
+**Regex Patterns:**
+```typescript
+const flow = addKeyword('/^\d{3,}$/', { regex: true })
+// Matches any message with 3+ digits
+```
+
+**Multiple Keywords:**
+```typescript
+const flow = addKeyword(['hi', 'hello', 'hey'])
+// Matches any of the keywords
+```
+
+## Flow Serialization
+
+When flows are created, they're serialized into an optimized format for fast lookup:
+
+```typescript
+const mergeToJsonSerialize = _flow.map((flowItem) => flowItem.toJson()).flat(2)
+this.flowSerialize = toSerialize(mergeToJsonSerialize)
+```
+
+This serialization:
+- Flattens nested flow structures
+- Creates unique references for each step
+- Builds an index for O(1) callback lookups
+
+## Flow Methods
+
+### Finding Flows
+
+The FlowClass provides multiple methods to locate flows:
+
+<Tabs>
+  <Tab title="By Serialize">
+    ```typescript
+    findBySerialize(refSerialize: string, k: number = 0): TContext | undefined
+    ```
+    Find a flow by its serialized reference, with optional offset.
+  </Tab>
+  
+  <Tab title="By Ref">
+    ```typescript
+    findSerializeByRef(ref: string): TContext | undefined
+    ```
+    Locate a flow using its unique reference ID.
+  </Tab>
+  
+  <Tab title="By Keyword">
+    ```typescript
+    findSerializeByKeyword(keyword: string): TContext | undefined
+    ```
+    Search for a flow by its trigger keyword.
+  </Tab>
+</Tabs>
+
+### Nested Flows
+
+Access child flows within a parent flow:
+
+```typescript
+getFlowsChild(): TContext[]
+```
+
+This method:
+- Extracts all nested flows from the main flow structure
+- Flattens the hierarchy for easy iteration
+- Filters out undefined references
+
+## Flow Structure (TFlow)
+
+Every flow object implements the `TFlow` interface:
+
+```typescript
+interface TFlow<P = any, B = any> {
+  ctx: TContext                    // Flow context
+  ref: string                      // Unique reference
+  addAnswer: (...) => TFlow<P, B>  // Add response
+  addAction: (...) => TFlow<P, B>  // Add callback
+  toJson: () => TContext[]         // Serialize
+}
+```
+
+## Practical Example
+
+Here's a complete flow demonstrating key concepts:
+
+```typescript
+import { createFlow, addKeyword } from '@builderbot/bot'
+
+// Main welcome flow with nested options
+const welcomeFlow = addKeyword(['hi', 'hello', 'hola'])
+  .addAnswer('Welcome! How can I help you today?')
+  .addAnswer(
+    'Choose an option:\n1. Documentation\n2. Support\n3. Pricing',
+    { capture: true },
+    async (ctx, { gotoFlow }) => {
+      if (ctx.body.includes('1')) {
+        return gotoFlow(docFlow)
+      }
+      if (ctx.body.includes('2')) {
+        return gotoFlow(supportFlow)
+      }
+      if (ctx.body.includes('3')) {
+        return gotoFlow(pricingFlow)
+      }
+    },
+    [docFlow, supportFlow, pricingFlow] // Nested flows
+  )
+
+const docFlow = addKeyword('doc')
+  .addAnswer('Documentation: https://builderbot.app/docs')
+
+const supportFlow = addKeyword('support')
+  .addAnswer('Contact support: support@example.com')
+
+const pricingFlow = addKeyword('pricing')
+  .addAnswer('View pricing: https://builderbot.app/pricing')
+
+const adapterFlow = createFlow([
+  welcomeFlow,
+  docFlow,
+  supportFlow,
+  pricingFlow
+])
+```
+
+## Best Practices
+
+<Note>
+  **Flow Organization**: Keep flows focused on specific conversation topics. Use nested flows for sub-conversations.
+</Note>
+
+<Warning>
+  **Array Requirement**: The `createFlow` function requires an array of flows. Passing a single flow without an array wrapper will throw an error.
+</Warning>
+
+<Tip>
+  **Performance**: The flow system is optimized for fast keyword matching. Even with hundreds of flows, lookups remain efficient through the serialization index.
+</Tip>
+
+## Error Handling
+
+The FlowClass validates inputs during construction:
+
+```typescript
+if (!Array.isArray(_flow)) throw new Error('Must be an array of flows')
+```
+
+Always wrap flows in an array when creating the flow adapter:
+
+```typescript
+// ✅ Correct
+const adapterFlow = createFlow([flow1, flow2])
+
+// ❌ Wrong - will throw error
+const adapterFlow = createFlow(flow1)
+```
+
+## Related Concepts
+
+- [Keywords](/concepts/keywords) - Learn about keyword matching and addKeyword
+- [State Management](/concepts/state-management) - Manage conversation state
+- [Events](/concepts/events) - Handle system and custom events

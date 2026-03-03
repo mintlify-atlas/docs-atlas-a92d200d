@@ -1,0 +1,268 @@
+---
+title: Event Constants
+description: Built-in event triggers and custom event utilities
+---
+
+BuilderBot provides pre-defined event constants for handling special message types and a utility to create custom events.
+
+## Built-in Events
+
+Use these constants with `addKeyword()` to trigger flows based on message types:
+
+<ResponseField name="EVENTS.WELCOME" type="string">
+  Triggered when a new conversation starts or a user sends their first message.
+  
+  ```javascript
+  const { addKeyword, EVENTS } = require('@builderbot/bot')
+  
+  const welcomeFlow = addKeyword(EVENTS.WELCOME)
+    .addAnswer('Welcome! How can I help you?')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.MEDIA" type="string">
+  Triggered when a user sends any media file (image, video, audio, document).
+  
+  ```javascript
+  const mediaFlow = addKeyword(EVENTS.MEDIA)
+    .addAnswer('Thanks for the media file!')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.LOCATION" type="string">
+  Triggered when a user shares their location.
+  
+  ```javascript
+  const locationFlow = addKeyword(EVENTS.LOCATION)
+    .addAnswer('Got your location!', null, async (ctx) => {
+      console.log(`Lat: ${ctx.lat}, Lng: ${ctx.lng}`)
+    })
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.DOCUMENT" type="string">
+  Triggered when a user sends a document file.
+  
+  ```javascript
+  const docFlow = addKeyword(EVENTS.DOCUMENT)
+    .addAnswer('Document received')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.VOICE_NOTE" type="string">
+  Triggered when a user sends a voice message.
+  
+  ```javascript
+  const voiceFlow = addKeyword(EVENTS.VOICE_NOTE)
+    .addAnswer('Voice note received')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.ACTION" type="string">
+  Triggered by button clicks or quick reply actions.
+  
+  ```javascript
+  const actionFlow = addKeyword(EVENTS.ACTION)
+    .addAnswer('Button clicked!')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.ORDER" type="string">
+  Triggered when a user places an order (WhatsApp Business catalogs).
+  
+  ```javascript
+  const orderFlow = addKeyword(EVENTS.ORDER)
+    .addAnswer('Processing your order...')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.TEMPLATE" type="string">
+  Triggered by WhatsApp template messages.
+  
+  ```javascript
+  const templateFlow = addKeyword(EVENTS.TEMPLATE)
+    .addAnswer('Template message received')
+  ```
+</ResponseField>
+
+<ResponseField name="EVENTS.CALL" type="string">
+  Triggered when a user initiates a voice or video call.
+  
+  ```javascript
+  const callFlow = addKeyword(EVENTS.CALL)
+    .addAnswer('I cannot handle calls. Please send a text message.')
+  ```
+</ResponseField>
+
+## Custom Events
+
+<ResponseField name="utils.setEvent" type="function">
+  Creates a custom event identifier that can be triggered programmatically.
+  
+  **Parameters:**
+  - `name` (string): Unique name for your custom event
+  
+  **Returns:** `string` - Encrypted event identifier
+  
+  ```javascript
+  const { addKeyword, utils } = require('@builderbot/bot')
+  
+  const PAYMENT_SUCCESS = utils.setEvent('payment-success')
+  
+  const paymentFlow = addKeyword(PAYMENT_SUCCESS)
+    .addAnswer('Payment successful!')
+  ```
+</ResponseField>
+
+## Event Utilities
+
+<ResponseField name="utils.getEventName" type="function">
+  Decrypts an event identifier to get its original name.
+  
+  **Parameters:**
+  - `fullHash` (string): Encrypted event identifier
+  
+  **Returns:** `string | null` - Original event name
+  
+  ```javascript
+  const eventName = utils.getEventName(PAYMENT_SUCCESS)
+  console.log(eventName) // '_event_custom_payment-success_'
+  ```
+</ResponseField>
+
+## Examples
+
+### Media Handler
+
+```javascript
+const { addKeyword, EVENTS } = require('@builderbot/bot')
+
+const mediaFlow = addKeyword(EVENTS.MEDIA)
+  .addAnswer(
+    'Processing your media...',
+    null,
+    async (ctx, { flowDynamic }) => {
+      const mediaType = ctx.mediaType // 'image', 'video', 'audio'
+      const mediaUrl = ctx.mediaUrl
+      
+      await flowDynamic(`Received ${mediaType}: ${mediaUrl}`)
+    }
+  )
+```
+
+### Location Service
+
+```javascript
+const locationFlow = addKeyword(EVENTS.LOCATION)
+  .addAnswer(
+    'Finding nearby stores...',
+    null,
+    async (ctx, { flowDynamic }) => {
+      const { lat, lng } = ctx
+      
+      // Find nearest store based on coordinates
+      const store = findNearestStore(lat, lng)
+      
+      await flowDynamic([
+        `Nearest store: ${store.name}`,
+        `Distance: ${store.distance} km`
+      ])
+    }
+  )
+```
+
+### Custom Event Trigger
+
+```javascript
+const { addKeyword, utils } = require('@builderbot/bot')
+
+// Define custom events
+const ORDER_COMPLETED = utils.setEvent('order-completed')
+const PAYMENT_FAILED = utils.setEvent('payment-failed')
+
+// Create flows for custom events
+const orderCompleteFlow = addKeyword(ORDER_COMPLETED)
+  .addAnswer('Your order has been completed!')
+  .addAnswer('Tracking number: 123456')
+
+const paymentFailedFlow = addKeyword(PAYMENT_FAILED)
+  .addAnswer('Payment failed. Please try again.')
+
+// Trigger custom event from another flow
+const checkoutFlow = addKeyword('checkout')
+  .addAnswer(
+    'Processing payment...',
+    null,
+    async (ctx, { flowDynamic, provider }) => {
+      const success = await processPayment()
+      
+      if (success) {
+        // Trigger ORDER_COMPLETED event
+        await provider.sendMessage(ctx.from, ORDER_COMPLETED, {})
+      } else {
+        // Trigger PAYMENT_FAILED event
+        await provider.sendMessage(ctx.from, PAYMENT_FAILED, {})
+      }
+    }
+  )
+```
+
+### Voice Note Handler
+
+```javascript
+const voiceFlow = addKeyword(EVENTS.VOICE_NOTE)
+  .addAnswer(
+    'Transcribing your voice message...',
+    null,
+    async (ctx, { flowDynamic }) => {
+      const audioUrl = ctx.mediaUrl
+      
+      // Transcribe audio
+      const transcript = await transcribeAudio(audioUrl)
+      
+      await flowDynamic(`You said: ${transcript}`)
+    }
+  )
+```
+
+### Multi-Event Handler
+
+```javascript
+const mediaOrLocationFlow = addKeyword([
+  EVENTS.MEDIA,
+  EVENTS.LOCATION,
+  EVENTS.DOCUMENT
+])
+  .addAnswer(
+    'Processing your upload...',
+    null,
+    async (ctx, { flowDynamic }) => {
+      if (ctx.lat && ctx.lng) {
+        await flowDynamic('Location received')
+      } else if (ctx.mediaType === 'document') {
+        await flowDynamic('Document received')
+      } else {
+        await flowDynamic('Media received')
+      }
+    }
+  )
+```
+
+## Event Regex Patterns
+
+For advanced use cases, event patterns are available:
+
+```javascript
+const { LIST_REGEX } = require('@builderbot/bot/io/events')
+
+const patterns = {
+  media: LIST_REGEX.REGEX_EVENT_MEDIA,
+  document: LIST_REGEX.REGEX_EVENT_DOCUMENT,
+  location: LIST_REGEX.REGEX_EVENT_LOCATION,
+  voiceNote: LIST_REGEX.REGEX_EVENT_VOICE_NOTE,
+  order: LIST_REGEX.REGEX_EVENT_ORDER,
+  template: LIST_REGEX.REGEX_EVENT_TEMPLATE,
+  custom: LIST_REGEX.REGEX_EVENT_CUSTOM,
+  call: LIST_REGEX.REGEX_EVENT_CALL
+}
+```

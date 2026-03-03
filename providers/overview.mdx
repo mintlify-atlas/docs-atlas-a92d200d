@@ -1,0 +1,132 @@
+---
+title: Providers Overview
+description: Connect your BuilderBot to multiple messaging platforms
+---
+
+BuilderBot supports multiple messaging providers, allowing you to build chatbots for various platforms using a unified API. Each provider is a separate package that handles platform-specific communication.
+
+## Available Providers
+
+<CardGroup cols={3}>
+  <Card title="Baileys" icon="whatsapp" href="/providers/baileys">
+    WhatsApp via Baileys library - Free, QR code authentication
+  </Card>
+  
+  <Card title="Meta" icon="meta" href="/providers/meta">
+    Official Meta WhatsApp Business API
+  </Card>
+  
+  <Card title="Evolution API" icon="bolt" href="/providers/evolution-api">
+    Evolution API for WhatsApp automation
+  </Card>
+  
+  <Card title="Telegram" icon="telegram" href="/providers/telegram">
+    Telegram Bot API integration
+  </Card>
+  
+  <Card title="Twilio" icon="message" href="/providers/twilio">
+    Twilio messaging platform
+  </Card>
+  
+  <Card title="Facebook Messenger" icon="facebook-messenger" href="/providers/facebook-messenger">
+    Facebook Messenger integration
+  </Card>
+  
+  <Card title="Instagram" icon="instagram" href="/providers/instagram">
+    Instagram Direct Messages
+  </Card>
+  
+  <Card title="Email" icon="envelope" href="/providers/email">
+    Email-based chatbot interactions
+  </Card>
+  
+  <Card title="WPPConnect" icon="whatsapp" href="/providers/wppconnect">
+    WhatsApp via WPPConnect library
+  </Card>
+  
+  <Card title="Venom" icon="whatsapp" href="/providers/venom">
+    WhatsApp via Venom library
+  </Card>
+  
+  <Card title="Web WhatsApp" icon="whatsapp" href="/providers/web-whatsapp">
+    WhatsApp Web automation
+  </Card>
+  
+  <Card title="Sherpa" icon="message" href="/providers/sherpa">
+    Sherpa messaging provider
+  </Card>
+  
+  <Card title="GoHighLevel" icon="chart-line" href="/providers/gohighlevel">
+    GoHighLevel CRM integration
+  </Card>
+</CardGroup>
+
+## Choosing a Provider
+
+### WhatsApp Providers
+
+For WhatsApp, you have several options:
+
+- **Baileys**: Free, QR code authentication, best for development and small-scale bots
+- **Meta**: Official Business API, requires approval, best for production at scale
+- **Evolution API**: Self-hosted API wrapper, provides HTTP API interface
+- **WPPConnect**: Browser-based automation, easy setup
+- **Venom**: Browser-based automation with additional features
+- **Web WhatsApp**: Direct WhatsApp Web automation
+
+### Other Platforms
+
+- **Telegram**: Official Bot API, easy to set up with API tokens
+- **Twilio**: Multi-channel messaging, paid service with reliable infrastructure
+- **Facebook Messenger**: Integrate with Facebook pages
+- **Instagram**: Direct message automation for Instagram business accounts
+- **Email**: Email-based conversational interfaces
+- **GoHighLevel**: CRM and marketing automation platform
+
+## Common Features
+
+All providers support:
+
+- **Text messaging**: Send and receive text messages
+- **Media handling**: Images, videos, audio files, and documents
+- **Event system**: Unified event handling for incoming messages
+- **File management**: Save and process media files
+
+Provider-specific features:
+
+- **Buttons**: Meta, Twilio
+- **Lists**: Meta, Twilio
+- **Templates**: Meta (WhatsApp Business)
+- **Flows**: Meta (WhatsApp Flows)
+- **Polls**: Baileys, WPPConnect
+
+## Installation Pattern
+
+All providers follow a similar installation pattern:
+
+```bash
+npm install @builderbot/bot @builderbot/provider-{name}
+```
+
+## Usage Pattern
+
+All providers share a common interface:
+
+```typescript
+import { createBot, createProvider, createFlow } from '@builderbot/bot'
+import { ProviderName } from '@builderbot/provider-name'
+
+const provider = createProvider(ProviderName, {
+  // Provider-specific configuration
+})
+
+const { handleCtx, httpServer } = await createBot({
+  flow: adapterFlow,
+  provider: provider,
+  database: adapterDB,
+})
+```
+
+## Next Steps
+
+Select a provider from the cards above to learn about its specific installation, configuration, and features.

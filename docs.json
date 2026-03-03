@@ -1,122 +1,178 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "BuilderBot",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#00B4D8",
+    "light": "#90E0EF",
+    "dark": "#0077B6"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/codigoencasa/builderbot"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/codigoencasa/builderbot",
+      "discord": "https://link.codigoencasa.com/DISCORD",
+      "twitter": "https://twitter.com/leifermendez"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/flows",
+              "concepts/keywords",
+              "concepts/providers",
+              "concepts/databases",
+              "concepts/state-management",
+              "concepts/events"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Providers",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "providers/overview",
+              "providers/baileys",
+              "providers/meta",
+              "providers/evolution-api",
+              "providers/telegram",
+              "providers/twilio",
+              "providers/facebook-messenger",
+              "providers/instagram",
+              "providers/email",
+              "providers/wppconnect",
+              "providers/venom",
+              "providers/web-whatsapp",
+              "providers/sherpa",
+              "providers/gohighlevel"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Databases",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "databases/overview",
+              "databases/memory",
+              "databases/json",
+              "databases/mongodb",
+              "databases/mysql",
+              "databases/postgresql"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-flows",
+              "guides/handling-media",
+              "guides/state-management",
+              "guides/custom-endpoints",
+              "guides/queue-system",
+              "guides/blacklist",
+              "guides/testing"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/dialogflow",
+              "integrations/dialogflow-cx",
+              "integrations/openai"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/create-bot",
+              "api/create-flow",
+              "api/create-provider",
+              "api/add-keyword",
+              "api/add-answer",
+              "api/add-action"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Bot Instance",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/bot/send-message",
+              "api/bot/dispatch",
+              "api/bot/blacklist",
+              "api/bot/state"
+            ]
+          },
+          {
+            "group": "Flow Methods",
+            "pages": [
+              "api/flow/goto-flow",
+              "api/flow/end-flow",
+              "api/flow/fall-back",
+              "api/flow/flow-dynamic"
+            ]
+          },
+          {
+            "group": "Context & State",
+            "pages": [
+              "api/context",
+              "api/state/global",
+              "api/state/conversation",
+              "api/state/idle"
+            ]
+          },
+          {
+            "group": "Utils",
+            "pages": [
+              "api/utils/events",
+              "api/utils/helpers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/overview",
+              "cli/create",
+              "cli/commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "community/contributing",
+              "community/examples",
+              "community/faq",
+              "community/changelog"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

@@ -1,0 +1,544 @@
+---
+title: Managing Blacklists
+description: Block and unblock users from interacting with your bot
+---
+
+The blacklist feature lets you prevent specific users from interacting with your bot. You can also use it as a whitelist to allow only specific users.
+
+## How Blacklisting Works
+
+When a user is blacklisted:
+- The bot ignores all their messages
+- They receive no responses
+- Their messages don't trigger any flows
+- The blacklist persists in memory until the bot restarts
+
+## Basic Usage
+
+### Initial Blacklist
+
+Set an initial blacklist when creating your bot:
+
+```javascript
+import { createBot } from '@builderbot/bot'
+
+const { httpServer } = await createBot(
+    {
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    },
+    {
+        blackList: ['1234567890', '0987654321']  // Blocked numbers
+    }
+)
+```
+
+### Adding to Blacklist
+
+Block users dynamically using the blacklist API:
+
+```javascript
+const blockFlow = addKeyword('block')
+    .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        blacklist.add(ctx.from)
+        await flowDynamic('You have been blocked')
+    })
+```
+
+### Removing from Blacklist
+
+Unblock users:
+
+```javascript
+const unblockFlow = addKeyword('unblock-me')
+    .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        try {
+            blacklist.remove(ctx.from)
+            await flowDynamic('You have been unblocked')
+        } catch (error) {
+            await flowDynamic('You were not blocked')
+        }
+    })
+```
+
+<Note>
+  `blacklist.remove()` throws an error if the number is not in the blacklist. Wrap it in try-catch to handle this.
+</Note>
+
+## Blacklist via HTTP Endpoints
+
+Manage the blacklist through your API:
+
+<Steps>
+  <Step title="Create add/remove endpoint">
+    ```javascript
+    adapterProvider.server.post(
+        '/v1/blacklist',
+        handleCtx(async (bot, req, res) => {
+            const { number, intent } = req.body
+            
+            if (intent === 'add') {
+                bot.blacklist.add(number)
+            } else if (intent === 'remove') {
+                bot.blacklist.remove(number)
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ 
+                status: 'ok', 
+                number, 
+                intent 
+            }))
+        })
+    )
+    ```
+  </Step>
+
+  <Step title="Create list endpoint">
+    ```javascript
+    adapterProvider.server.get(
+        '/v1/blacklist/list',
+        handleCtx(async (bot, req, res) => {
+            const blacklist = bot.blacklist.getList()
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ 
+                status: 'ok', 
+                blacklist 
+            }))
+        })
+    )
+    ```
+  </Step>
+
+  <Step title="Test the API">
+    ```bash
+    # Add to blacklist
+    curl -X POST http://localhost:3008/v1/blacklist \
+      -H "Content-Type: application/json" \
+      -d '{"number": "1234567890", "intent": "add"}'
+    
+    # Remove from blacklist
+    curl -X POST http://localhost:3008/v1/blacklist \
+      -H "Content-Type: application/json" \
+      -d '{"number": "1234567890", "intent": "remove"}'
+    
+    # Get blacklist
+    curl http://localhost:3008/v1/blacklist/list
+    ```
+  </Step>
+</Steps>
+
+## Blacklist Methods
+
+Available methods on the `blacklist` object:
+
+### add()
+
+Add one or more numbers to the blacklist:
+
+```javascript
+// Add single number
+blacklist.add('1234567890')
+
+// Add multiple numbers
+blacklist.add(['1234567890', '0987654321'])
+```
+
+**Returns:** Array of status messages
+
+```javascript
+const messages = blacklist.add(['1234567890', '1234567890'])
+// Returns: [
+//   'Número 1234567890 añadido exitosamente.',
+//   'El número de teléfono 1234567890 ya está en la lista negra.'
+// ]
+```
+
+### remove()
+
+Remove a number from the blacklist:
+
+```javascript
+try {
+    blacklist.remove('1234567890')
+    console.log('Removed successfully')
+} catch (error) {
+    console.log('Number was not in blacklist')
+}
+```
+
+**Throws:** Error if number is not in the blacklist
+
+### checkIf()
+
+Check if a number is blacklisted:
+
+```javascript
+if (blacklist.checkIf('1234567890')) {
+    console.log('This number is blocked')
+} else {
+    console.log('This number is allowed')
+}
+```
+
+**Returns:** `true` if blacklisted, `false` otherwise
+
+### getList()
+
+Get all blacklisted numbers:
+
+```javascript
+const numbers = blacklist.getList()
+console.log('Blacklisted numbers:', numbers)
+// Returns: ['1234567890', '0987654321']
+```
+
+**Returns:** Array of phone numbers
+
+## Whitelist Mode
+
+Use the blacklist as a whitelist by prefixing allowed numbers with `!`:
+
+```javascript
+const { httpServer } = await createBot(
+    {
+        flow: adapterFlow,
+        provider: adapterProvider,
+        database: adapterDB,
+    },
+    {
+        blackList: [
+            '!1234567890',  // Only this number is allowed
+            '!0987654321'   // And this one
+        ]
+    }
+)
+```
+
+<Note>
+  When ANY number starts with `!`, the blacklist switches to whitelist mode. Only numbers with `!` prefix can interact with the bot.
+</Note>
+
+### Whitelist Example
+
+```javascript
+// Whitelist mode: Only allow specific users
+const { httpServer } = await createBot(
+    { flow, provider, database },
+    {
+        blackList: [
+            '!1111111111',  // Admin 1
+            '!2222222222',  // Admin 2
+            '!3333333333'   // Admin 3
+        ]
+    }
+)
+
+// Now only these three numbers can use the bot
+```
+
+## Dynamic Blacklist Management
+
+### Admin-Controlled Blacklist
+
+Let admins manage the blacklist:
+
+```javascript
+const ADMIN_NUMBERS = ['1111111111', '2222222222']
+
+const blockUserFlow = addKeyword('block')
+    .addAnswer(
+        'Enter number to block:',
+        { capture: true },
+        async (ctx, { blacklist, flowDynamic }) => {
+            // Check if user is admin
+            if (!ADMIN_NUMBERS.includes(ctx.from)) {
+                return flowDynamic('Unauthorized')
+            }
+            
+            const numberToBlock = ctx.body.trim()
+            blacklist.add(numberToBlock)
+            
+            await flowDynamic(`Blocked: ${numberToBlock}`)
+        }
+    )
+
+const unblockUserFlow = addKeyword('unblock')
+    .addAnswer(
+        'Enter number to unblock:',
+        { capture: true },
+        async (ctx, { blacklist, flowDynamic }) => {
+            if (!ADMIN_NUMBERS.includes(ctx.from)) {
+                return flowDynamic('Unauthorized')
+            }
+            
+            const numberToUnblock = ctx.body.trim()
+            
+            try {
+                blacklist.remove(numberToUnblock)
+                await flowDynamic(`Unblocked: ${numberToUnblock}`)
+            } catch (error) {
+                await flowDynamic('Number was not blocked')
+            }
+        }
+    )
+```
+
+### Time-Based Temporary Bans
+
+```javascript
+const tempBanFlow = addKeyword('tempban')
+    .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        const userNumber = ctx.from
+        
+        // Add to blacklist
+        blacklist.add(userNumber)
+        await flowDynamic('You are temporarily banned for 1 hour')
+        
+        // Remove after 1 hour
+        setTimeout(() => {
+            try {
+                blacklist.remove(userNumber)
+                console.log(`Temp ban expired for ${userNumber}`)
+            } catch (error) {
+                console.log('User already unblocked')
+            }
+        }, 60 * 60 * 1000)  // 1 hour
+    })
+```
+
+### Rate Limit Protection
+
+Block users who spam:
+
+```javascript
+const messageCount = new Map()
+
+const checkSpam = (number) => {
+    const count = messageCount.get(number) || 0
+    const newCount = count + 1
+    messageCount.set(number, newCount)
+    
+    // Reset after 1 minute
+    setTimeout(() => {
+        messageCount.set(number, 0)
+    }, 60000)
+    
+    return newCount > 10  // More than 10 messages per minute
+}
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+    .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        if (checkSpam(ctx.from)) {
+            blacklist.add(ctx.from)
+            await flowDynamic('Blocked due to spam')
+            return
+        }
+        
+        await flowDynamic('Welcome!')
+    })
+```
+
+## Complete Blacklist Example
+
+```javascript
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const PORT = process.env.PORT ?? 3008
+const ADMIN_NUMBERS = ['1111111111']
+
+const welcomeFlow = addKeyword(['hi', 'hello'])
+    .addAnswer('Welcome! Type *help* for commands')
+
+const blockFlow = addKeyword('block')
+    .addAnswer(
+        'Enter number to block:',
+        { capture: true },
+        async (ctx, { blacklist, flowDynamic }) => {
+            if (!ADMIN_NUMBERS.includes(ctx.from)) {
+                return flowDynamic('Only admins can block users')
+            }
+            
+            blacklist.add(ctx.body.trim())
+            await flowDynamic(`Blocked: ${ctx.body}`)
+        }
+    )
+
+const unblockFlow = addKeyword('unblock')
+    .addAnswer(
+        'Enter number to unblock:',
+        { capture: true },
+        async (ctx, { blacklist, flowDynamic }) => {
+            if (!ADMIN_NUMBERS.includes(ctx.from)) {
+                return flowDynamic('Only admins can unblock users')
+            }
+            
+            try {
+                blacklist.remove(ctx.body.trim())
+                await flowDynamic(`Unblocked: ${ctx.body}`)
+            } catch (error) {
+                await flowDynamic('Number was not blocked')
+            }
+        }
+    )
+
+const listBlockedFlow = addKeyword('blocked')
+    .addAction(async (ctx, { blacklist, flowDynamic }) => {
+        if (!ADMIN_NUMBERS.includes(ctx.from)) {
+            return flowDynamic('Only admins can view blacklist')
+        }
+        
+        const blocked = blacklist.getList()
+        
+        if (blocked.length === 0) {
+            await flowDynamic('No blocked numbers')
+        } else {
+            await flowDynamic(`Blocked numbers:\n${blocked.join('\n')}`)
+        }
+    })
+
+const main = async () => {
+    const adapterFlow = createFlow([welcomeFlow, blockFlow, unblockFlow, listBlockedFlow])
+    const adapterProvider = createProvider(BaileysProvider)
+    const adapterDB = new MemoryDB()
+
+    const { handleCtx, httpServer } = await createBot(
+        {
+            flow: adapterFlow,
+            provider: adapterProvider,
+            database: adapterDB,
+        },
+        {
+            blackList: []  // Start with empty blacklist
+        }
+    )
+
+    // HTTP endpoints for blacklist management
+    adapterProvider.server.post(
+        '/v1/blacklist',
+        handleCtx(async (bot, req, res) => {
+            const { number, intent } = req.body
+            
+            if (intent === 'add') {
+                bot.blacklist.add(number)
+            } else if (intent === 'remove') {
+                bot.blacklist.remove(number)
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ status: 'ok', number, intent }))
+        })
+    )
+
+    adapterProvider.server.get(
+        '/v1/blacklist/list',
+        handleCtx(async (bot, req, res) => {
+            const blacklist = bot.blacklist.getList()
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(JSON.stringify({ status: 'ok', blacklist }))
+        })
+    )
+
+    httpServer(+PORT)
+}
+
+main()
+```
+
+## Best Practices
+
+<Accordion title="Persist blacklist to database">
+  The blacklist is stored in memory and resets on bot restart. For persistence:
+  
+  ```javascript
+  // On bot start, load from database
+  const savedBlacklist = await database.loadBlacklist()
+  const { httpServer } = await createBot(
+      { flow, provider, database },
+      { blackList: savedBlacklist }
+  )
+  
+  // When adding to blacklist, save to database
+  blacklist.add(number)
+  await database.saveBlacklist(blacklist.getList())
+  ```
+</Accordion>
+
+<Accordion title="Notify users when blocked">
+  Send a final message before blocking:
+  
+  ```javascript
+  .addAction(async (ctx, { blacklist, flowDynamic }) => {
+      await flowDynamic('You have been blocked for violating our terms')
+      blacklist.add(ctx.from)
+  })
+  ```
+</Accordion>
+
+<Accordion title="Log blacklist changes">
+  Keep an audit trail:
+  
+  ```javascript
+  blacklist.add(number)
+  console.log(`[${new Date().toISOString()}] Blocked: ${number}`)
+  await database.logAction('blacklist_add', { number })
+  ```
+</Accordion>
+
+<Accordion title="Validate admin permissions">
+  Always check permissions before allowing blacklist changes:
+  
+  ```javascript
+  const isAdmin = (number) => ADMIN_NUMBERS.includes(number)
+  
+  if (!isAdmin(ctx.from)) {
+      return flowDynamic('Unauthorized')
+  }
+  ```
+</Accordion>
+
+## Troubleshooting
+
+<Accordion title="Blacklist not working">
+  Check that the number format matches exactly:
+  ```javascript
+  // These are different:
+  blacklist.add('1234567890')      // Without country code
+  blacklist.add('521234567890')    // With country code
+  
+  // Check actual number format
+  console.log('User number:', ctx.from)
+  ```
+</Accordion>
+
+<Accordion title="Whitelist not activating">
+  Ensure at least one number has the `!` prefix:
+  ```javascript
+  // This is blacklist mode (blocks these numbers)
+  blackList: ['1234567890', '0987654321']
+  
+  // This is whitelist mode (only allows these numbers)
+  blackList: ['!1234567890', '!0987654321']
+  ```
+</Accordion>
+
+<Accordion title="User can't be unblocked">
+  Remember `remove()` throws an error if number isn't blocked:
+  ```javascript
+  try {
+      blacklist.remove(number)
+  } catch (error) {
+      console.log('Number was not in blacklist')
+  }
+  ```
+</Accordion>
+
+## Next Steps
+
+- Learn about [State Management](/guides/state-management) to track blocked users
+- Explore [Custom Endpoints](/guides/custom-endpoints) to manage blacklist via API
+- Check out [Queue System](/guides/queue-system) to understand message processing

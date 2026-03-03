@@ -1,0 +1,497 @@
+---
+title: Installation
+description: Detailed installation instructions for BuilderBot in any environment.
+---
+
+## System Requirements
+
+Before installing BuilderBot, ensure your system meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Version 18 or higher** is required
+  </Card>
+  <Card title="Package Manager" icon="box">
+    **pnpm 8.6.12+** recommended, npm and yarn also supported
+  </Card>
+</CardGroup>
+
+<Warning>
+  Node.js 16 and below are not supported. BuilderBot requires Node.js 18+ for optimal performance and compatibility.
+</Warning>
+
+## Quick Installation
+
+The fastest way to get started is with the BuilderBot CLI:
+
+<Steps>
+  <Step title="Run the create command">
+    ```bash
+    npm create builderbot@latest
+    ```
+
+    This interactive CLI will guide you through:
+    - Project name selection
+    - Language choice (JavaScript or TypeScript)
+    - Provider selection (WhatsApp, Telegram, etc.)
+    - Database choice (Memory, MongoDB, MySQL, PostgreSQL, JSON)
+  </Step>
+
+  <Step title="Navigate to your project">
+    ```bash
+    cd your-project-name
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    <CodeGroup>
+    ```bash npm
+    npm install
+    ```
+
+    ```bash pnpm
+    pnpm install
+    ```
+
+    ```bash yarn
+    yarn install
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start your bot">
+    ```bash
+    npm start
+    ```
+  </Step>
+</Steps>
+
+## Manual Installation
+
+For more control over your setup, you can install BuilderBot manually:
+
+### 1. Initialize Your Project
+
+```bash
+mkdir my-chatbot
+cd my-chatbot
+npm init -y
+```
+
+### 2. Install Core Package
+
+```bash
+npm install @builderbot/bot
+```
+
+### 3. Install a Provider
+
+Choose one based on your messaging platform:
+
+<Tabs>
+  <Tab title="Baileys (WhatsApp)">
+    ```bash
+    npm install @builderbot/provider-baileys
+    ```
+
+    Baileys is a free, open-source WhatsApp Web API implementation. Best for development and small-scale bots.
+  </Tab>
+
+  <Tab title="Meta (WhatsApp Business)">
+    ```bash
+    npm install @builderbot/provider-meta
+    ```
+
+    Official WhatsApp Business API. Requires Meta Business account and approved number.
+  </Tab>
+
+  <Tab title="Twilio">
+    ```bash
+    npm install @builderbot/provider-twilio
+    ```
+
+    Enterprise-grade SMS and WhatsApp messaging via Twilio.
+  </Tab>
+
+  <Tab title="Telegram">
+    ```bash
+    npm install @builderbot/provider-telegram
+    ```
+
+    Telegram Bot API integration.
+  </Tab>
+
+  <Tab title="Other Providers">
+    BuilderBot supports many providers:
+
+    ```bash
+    # WPPConnect (WhatsApp)
+    npm install @builderbot/provider-wppconnect
+
+    # Evolution API (WhatsApp)
+    npm install @builderbot/provider-evolution-api
+
+    # Venom (WhatsApp)
+    npm install @builderbot/provider-venom
+
+    # Facebook Messenger
+    npm install @builderbot/provider-facebook-messenger
+
+    # Instagram
+    npm install @builderbot/provider-instagram
+
+    # Email
+    npm install @builderbot/provider-email
+
+    # GoHighLevel
+    npm install @builderbot/provider-gohighlevel
+    ```
+  </Tab>
+</Tabs>
+
+### 4. Install a Database (Optional)
+
+For development, the built-in `MemoryDB` is sufficient. For production, choose a persistent database:
+
+<Tabs>
+  <Tab title="Memory (Built-in)">
+    ```javascript
+    import { MemoryDB } from '@builderbot/bot'
+
+    const database = new MemoryDB()
+    ```
+
+    No installation needed. Data is lost when the bot restarts.
+  </Tab>
+
+  <Tab title="MongoDB">
+    ```bash
+    npm install @builderbot/database-mongo
+    ```
+
+    ```javascript
+    import { MongoAdapter } from '@builderbot/database-mongo'
+
+    const database = new MongoAdapter({
+      dbUri: 'mongodb://localhost:27017',
+      dbName: 'builderbot'
+    })
+    ```
+  </Tab>
+
+  <Tab title="MySQL">
+    ```bash
+    npm install @builderbot/database-mysql
+    ```
+
+    ```javascript
+    import { MySQLAdapter } from '@builderbot/database-mysql'
+
+    const database = new MySQLAdapter({
+      host: 'localhost',
+      user: 'root',
+      database: 'builderbot',
+      password: 'your-password'
+    })
+    ```
+  </Tab>
+
+  <Tab title="PostgreSQL">
+    ```bash
+    npm install @builderbot/database-postgres
+    ```
+
+    ```javascript
+    import { PostgreSQLAdapter } from '@builderbot/database-postgres'
+
+    const database = new PostgreSQLAdapter({
+      host: 'localhost',
+      user: 'postgres',
+      database: 'builderbot',
+      password: 'your-password'
+    })
+    ```
+  </Tab>
+
+  <Tab title="JSON File">
+    ```bash
+    npm install @builderbot/database-json
+    ```
+
+    ```javascript
+    import { JsonFileAdapter } from '@builderbot/database-json'
+
+    const database = new JsonFileAdapter()
+    ```
+
+    Stores data in local JSON files. Good for small bots and testing.
+  </Tab>
+</Tabs>
+
+### 5. Create Your Bot File
+
+Create `app.js` (or `app.ts` for TypeScript):
+
+<CodeGroup>
+```javascript app.js
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const PORT = process.env.PORT ?? 3008
+
+const welcomeFlow = addKeyword(['hi', 'hello', 'hola'])
+  .addAnswer('🙌 Hello! Welcome to this chatbot.')
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  const { httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(+PORT)
+  console.log(`Bot is running on port ${PORT}`)
+}
+
+main()
+```
+
+```typescript app.ts
+import { createBot, createProvider, createFlow, addKeyword } from '@builderbot/bot'
+import { MemoryDB } from '@builderbot/bot'
+import { BaileysProvider } from '@builderbot/provider-baileys'
+
+const PORT = process.env.PORT ?? 3008
+
+const welcomeFlow = addKeyword(['hi', 'hello', 'hola'])
+  .addAnswer('🙌 Hello! Welcome to this chatbot.')
+
+const main = async () => {
+  const adapterFlow = createFlow([welcomeFlow])
+  const adapterProvider = createProvider(BaileysProvider)
+  const adapterDB = new MemoryDB()
+
+  const { httpServer } = await createBot({
+    flow: adapterFlow,
+    provider: adapterProvider,
+    database: adapterDB,
+  })
+
+  httpServer(+PORT)
+  console.log(`Bot is running on port ${PORT}`)
+}
+
+main()
+```
+</CodeGroup>
+
+### 6. Configure package.json
+
+Add the module type and start script:
+
+```json package.json
+{
+  "name": "my-chatbot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "@builderbot/bot": "^1.3.10",
+    "@builderbot/provider-baileys": "latest"
+  }
+}
+```
+
+<Note>
+  The `"type": "module"` field enables ES6 module syntax. If you prefer CommonJS, use `require()` instead of `import`.
+</Note>
+
+## TypeScript Setup
+
+For TypeScript projects, add these configurations:
+
+### Install TypeScript Dependencies
+
+```bash
+npm install -D typescript @types/node tsx
+```
+
+### Create tsconfig.json
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
+```
+
+### Update package.json Scripts
+
+```json package.json
+{
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js"
+  }
+}
+```
+
+Now you can develop with hot-reload:
+
+```bash
+npm run dev
+```
+
+## Environment Variables
+
+Create a `.env` file for configuration:
+
+```bash .env
+PORT=3008
+NODE_ENV=development
+
+# Database configuration (if using external DB)
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your-password
+DB_NAME=builderbot
+
+# Provider-specific variables
+# For Meta provider:
+META_ACCESS_TOKEN=your-token
+META_PHONE_NUMBER_ID=your-phone-id
+META_VERIFY_TOKEN=your-verify-token
+
+# For Twilio provider:
+TWILIO_ACCOUNT_SID=your-sid
+TWILIO_AUTH_TOKEN=your-token
+TWILIO_PHONE_NUMBER=your-number
+```
+
+Install dotenv to load environment variables:
+
+```bash
+npm install dotenv
+```
+
+Load it in your app:
+
+```javascript
+import 'dotenv/config'
+// Rest of your code
+```
+
+## Verification
+
+Verify your installation:
+
+<Steps>
+  <Step title="Check Node.js version">
+    ```bash
+    node --version
+    ```
+
+    Should output v18.0.0 or higher.
+  </Step>
+
+  <Step title="Run your bot">
+    ```bash
+    npm start
+    ```
+
+    You should see:
+    - Bot initialization messages
+    - QR code (for Baileys provider)
+    - HTTP server started message
+  </Step>
+
+  <Step title="Test connection">
+    For Baileys: Scan the QR code with WhatsApp
+    
+    For other providers: Follow provider-specific setup instructions
+  </Step>
+</Steps>
+
+## Common Installation Issues
+
+<AccordionGroup>
+  <Accordion title="Node version too old">
+    **Error**: `The engine "node" is incompatible with this module`
+
+    **Solution**: Upgrade Node.js to version 18 or higher:
+    ```bash
+    # Using nvm
+    nvm install 18
+    nvm use 18
+
+    # Or download from nodejs.org
+    ```
+  </Accordion>
+
+  <Accordion title="Module not found errors">
+    **Error**: `Cannot find module '@builderbot/bot'`
+
+    **Solution**: Ensure dependencies are installed:
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+
+  <Accordion title="QR code not appearing">
+    **Error**: No QR code shown when using Baileys
+
+    **Solution**: 
+    - Check your terminal supports displaying QR codes
+    - Try running in a different terminal
+    - Ensure port 3008 (or your PORT) is not in use
+  </Accordion>
+
+  <Accordion title="Database connection failed">
+    **Error**: Database connection errors
+
+    **Solution**:
+    - Verify database server is running
+    - Check connection credentials in .env
+    - Ensure database exists
+    - For development, use MemoryDB to bypass database issues
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first chatbot with step-by-step guidance
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts">
+    Learn about flows, providers, and databases
+  </Card>
+  <Card title="Provider Configuration" icon="plug" href="/providers">
+    Configure your chosen messaging platform
+  </Card>
+  <Card title="Deployment" icon="cloud" href="/deployment">
+    Deploy your bot to production
+  </Card>
+</CardGroup>

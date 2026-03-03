@@ -1,0 +1,154 @@
+---
+title: Global State
+description: Shared state accessible across all conversations
+---
+
+Global state allows you to store data that persists across all conversations. Unlike conversation state, global state is shared by all users.
+
+## Usage
+
+```javascript
+const flow = addKeyword('stats')
+  .addAnswer('Checking stats...', null, async (ctx, { globalState, flowDynamic }) => {
+    // Read from global state
+    const totalUsers = await globalState.get('totalUsers') || 0
+    
+    // Update global state
+    await globalState.update({ totalUsers: totalUsers + 1 })
+    
+    await flowDynamic(`Total users: ${totalUsers + 1}`)
+  })
+```
+
+## Methods
+
+<ResponseField name="update" type="function">
+  Updates the global state with new key-value pairs.
+  
+  **Parameters:**
+  - `keyValue` (object): Key-value pairs to merge into global state
+  
+  **Returns:** `Promise<void>`
+  
+  ```javascript
+  await globalState.update({
+    totalMessages: 150,
+    lastRestart: Date.now()
+  })
+  ```
+</ResponseField>
+
+<ResponseField name="get" type="function">
+  Retrieves a specific value from global state. Supports nested properties using dot notation.
+  
+  **Parameters:**
+  - `prop` (string): Property name or path (e.g., "user.settings.theme")
+  
+  **Returns:** `any`
+  
+  ```javascript
+  const total = globalState.get('totalMessages')
+  const theme = globalState.get('config.theme')
+  ```
+</ResponseField>
+
+<ResponseField name="getMyState" type="function">
+  Returns the entire global state object.
+  
+  **Returns:** `object`
+  
+  ```javascript
+  const allState = globalState.getMyState()
+  console.log(allState)
+  ```
+</ResponseField>
+
+<ResponseField name="clear" type="function">
+  Clears all global state data.
+  
+  **Returns:** `void`
+  
+  ```javascript
+  globalState.clear()
+  ```
+</ResponseField>
+
+## Examples
+
+### Track Global Statistics
+
+```javascript
+const statsFlow = addKeyword('stats')
+  .addAnswer('Loading stats...', null, async (ctx, { globalState, flowDynamic }) => {
+    const stats = globalState.getMyState() || {
+      totalMessages: 0,
+      totalUsers: 0,
+      startTime: Date.now()
+    }
+    
+    stats.totalMessages += 1
+    await globalState.update(stats)
+    
+    const uptime = Math.floor((Date.now() - stats.startTime) / 1000 / 60)
+    await flowDynamic([
+      `Total messages: ${stats.totalMessages}`,
+      `Total users: ${stats.totalUsers}`,
+      `Uptime: ${uptime} minutes`
+    ])
+  })
+```
+
+### Feature Flags
+
+```javascript
+const betaFlow = addKeyword('beta')
+  .addAnswer(null, null, async (ctx, { globalState, flowDynamic }) => {
+    const betaEnabled = globalState.get('features.beta')
+    
+    if (!betaEnabled) {
+      return flowDynamic('Beta features are currently disabled.')
+    }
+    
+    await flowDynamic('Welcome to beta features!')
+  })
+```
+
+### Configuration Management
+
+```javascript
+const configFlow = addKeyword('config')
+  .addAnswer('Configuration:', null, async (ctx, { globalState, flowDynamic }) => {
+    await globalState.update({
+      config: {
+        maxRetries: 3,
+        timeout: 5000,
+        enableLogging: true
+      }
+    })
+    
+    const maxRetries = globalState.get('config.maxRetries')
+    await flowDynamic(`Max retries set to: ${maxRetries}`)
+  })
+```
+
+## Initial State
+
+You can set initial global state when creating the bot:
+
+```javascript
+const main = async () => {
+  await createBot({
+    flow: createFlow([welcomeFlow]),
+    provider: createProvider(BaileysProvider),
+    database: new MemoryDB(),
+  }, {
+    globalState: {
+      totalUsers: 0,
+      features: {
+        beta: false,
+        premium: true
+      }
+    }
+  })
+}
+```
